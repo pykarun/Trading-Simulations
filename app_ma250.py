@@ -278,7 +278,7 @@ st.markdown("---")
 
 # --- Top-of-page Simulation Parameters (moved from sidebar for mobile) ---
 st.header("Simulation Parameters")
-params_cols = st.columns([1,1,1,1,1])  # adjust layout as desired
+params_cols = st.columns([1,1,1,1])  # removed MA inputs from this row
 
 with params_cols[0]:
     start_date = st.date_input("Start Date", datetime.date(2025, 1, 1))
@@ -287,23 +287,25 @@ with params_cols[1]:
 with params_cols[2]:
     initial_capital = st.number_input("Initial Capital", min_value=1000, value=10000, step=1000)
 with params_cols[3]:
-    ma_period = st.number_input("MA Period (days)", min_value=5, max_value=250, value=15, step=5)
-with params_cols[4]:
-    ma_type = st.radio("MA Type", ('SMA', 'EMA'), index=1, horizontal=True)
+    # Kept empty or used for future options; MA controls moved below
+    st.write("")
 
 st.markdown("---")
 st.subheader("Strategy Configuration")
 config_cols = st.columns([1,1,2])
 
+# Moved MA controls into Strategy Configuration before downtrend strategy
 with config_cols[0]:
-    st.markdown("**Uptrend**: If QQQ Close > MA, hold TQQQ.")
+    ma_period = st.number_input("MA Period (days)", min_value=5, max_value=250, value=15, step=5)
 with config_cols[1]:
+    ma_type = st.radio("MA Type", ('SMA', 'EMA'), index=1, horizontal=True)
+with config_cols[2]:
+    st.markdown("**Uptrend**: If QQQ Close > MA, hold TQQQ.")
     downtrend_strategy = st.radio(
         "Downtrend Strategy (when Close < MA)",
         ('Invest in SQQQ', 'Hold Cash'),
         index=1
     )
-with config_cols[2]:
     st.markdown("**Downtrend**: If QQQ Close < MA, either hold SQQQ or move to Cash.")
 
 # Run Button placed near the inputs for easier mobile access

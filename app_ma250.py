@@ -276,7 +276,7 @@ st.markdown("---")
 # --- Sidebar for User Inputs ---
 with st.sidebar:
     st.header("Simulation Parameters")
-    start_date = st.date_input("Start Date", datetime.date(2020, 1, 1))
+    start_date = st.date_input("Start Date", datetime.date(2025, 1, 1))
     end_date = st.date_input("End Date", datetime.date.today())
     initial_capital = st.number_input("Initial Capital", min_value=1000, value=10000, step=1000)
     

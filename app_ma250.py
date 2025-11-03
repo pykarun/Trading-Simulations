@@ -263,41 +263,51 @@ st.markdown("A simple moving-average based TQQQ/SQQQ backtester. Click for detai
 with st.expander("How The Strategy Works"):
     st.markdown("""
     ### How The Strategy Works
-    This backtester simulates a simple trend-following strategy based on a single Moving Average (MA) of the QQQ ETF. You can choose between a Simple Moving Average (SMA) or an Exponential Moving Average [...]
+    This backtester simulates a simple trend-following strategy based on a single Moving Average (MA) of the QQQ ETF. You can choose between a Simple Moving Average (SMA) or an Exponential Moving Aver[...]
 
     **Decision Logic:**
-    The core of the strategy is a daily decision made near the market close. For this simulation, we use the official daily closing price to represent this decision point (e.g., the price at 3:55 PM EST).
+    The core of the strategy is a daily decision made near the market close. For this simulation, we use the official daily closing price to represent this decision point (e.g., the price at 3:55 PM E[...]
 
     1.  **Signal Check**: At the end of each trading day, the strategy compares QQQ's closing price to its selected Moving Average (SMA or EMA).
     2.  **Uptrend (Price > MA)**: If the price is above the MA, the strategy decides to hold **TQQQ** for the next trading day to capture leveraged upside moves.
-    3.  **Downtrend (Price < MA)**: If the price is below the MA, the strategy takes a defensive position for the next day, either by holding **SQQQ** (to profit from a downturn) or by moving to **Cash**.
+    3.  **Downtrend (Price < MA)**: If the price is below the MA, the strategy takes a defensive position for the next day, either by holding **SQQQ** (to profit from a downturn) or by moving to **Cas[...]
 
     The backtest assumes a trade is executed based on the previous day's closing signal and held for the entire following day, with the return calculated from close-to-close.
     """)
 st.markdown("---")
 
-# --- Sidebar for User Inputs ---
-with st.sidebar:
-    st.header("Simulation Parameters")
+# --- Top-of-page Simulation Parameters (moved from sidebar for mobile) ---
+st.header("Simulation Parameters")
+params_cols = st.columns([1,1,1,1,1])  # adjust layout as desired
+
+with params_cols[0]:
     start_date = st.date_input("Start Date", datetime.date(2025, 1, 1))
+with params_cols[1]:
     end_date = st.date_input("End Date", datetime.date.today())
+with params_cols[2]:
     initial_capital = st.number_input("Initial Capital", min_value=1000, value=10000, step=1000)
-    
-    st.markdown("---")
-    st.subheader("Strategy Configuration")
-    st.markdown("""
-    - **Uptrend**: If QQQ Close > MA, the strategy will hold TQQQ.
-    - **Downtrend**: If QQQ Close < MA, the strategy will either hold SQQQ or move to Cash.
-    """)
-    ma_period = st.number_input("Moving Average Period (days)", min_value=5, max_value=250, value=15, step=5)
-    ma_type = st.radio("Moving Average Type", ('SMA', 'EMA'), index=1)
+with params_cols[3]:
+    ma_period = st.number_input("MA Period (days)", min_value=5, max_value=250, value=15, step=5)
+with params_cols[4]:
+    ma_type = st.radio("MA Type", ('SMA', 'EMA'), index=1, horizontal=True)
+
+st.markdown("---")
+st.subheader("Strategy Configuration")
+config_cols = st.columns([1,1,2])
+
+with config_cols[0]:
+    st.markdown("**Uptrend**: If QQQ Close > MA, hold TQQQ.")
+with config_cols[1]:
     downtrend_strategy = st.radio(
         "Downtrend Strategy (when Close < MA)",
         ('Invest in SQQQ', 'Hold Cash'),
         index=1
     )
+with config_cols[2]:
+    st.markdown("**Downtrend**: If QQQ Close < MA, either hold SQQQ or move to Cash.")
 
-    run_button = st.button("Run Simulation")
+# Run Button placed near the inputs for easier mobile access
+run_button = st.button("Run Simulation")
 
 # --- Main App Body ---
 
@@ -333,4 +343,4 @@ if run_button:
             st.dataframe(pd.DataFrame(actions_log))
 
 else:
-    st.info("Adjust the parameters in the sidebar and click 'Run Simulation' to start.")
+    st.info("Adjust the parameters above and click 'Run Simulation' to start.")

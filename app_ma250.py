@@ -159,22 +159,25 @@ def calculate_performance_metrics(portfolio_df, qqq_main_df, initial_capital, nu
     end_date = portfolio_df.index[-1]
     days = (end_date - start_date).days
     years = days / 365.25
-    cagr = ((final_value / initial_capital) ** (1 / years)) - 1 if years > 0 else 0
+
+    # Actual Return (not CAGR)
+    actual_return = (final_value / initial_capital) - 1 if initial_capital > 0 else 0
+
     drawdown = (portfolio_df['Capital'] / portfolio_df['Capital'].cummax() - 1).min()
     
-    # QQQ Buy & Hold metrics for the same period
+    # QQQ Buy & Hold metrics for the same period (Actual Return)
     qqq_benchmark = qqq_main_df['Close'].loc[start_date:end_date]
-    if not qqq_benchmark.empty and years > 0:
-        qqq_cagr = ((qqq_benchmark.iloc[-1] / qqq_benchmark.iloc[0]) ** (1 / years)) - 1
+    if not qqq_benchmark.empty and initial_capital > 0:
+        qqq_actual_return = (qqq_benchmark.iloc[-1] / qqq_benchmark.iloc[0]) - 1
     else:
-        qqq_cagr = 0
+        qqq_actual_return = 0
 
     return {
         "Final Portfolio Value": final_value,
-        "CAGR": cagr,
+        "Actual Return": actual_return,
         "Max Drawdown": drawdown,
         "Total Trades": num_trades,
-        "QQQ CAGR": qqq_cagr
+        "QQQ Actual Return": qqq_actual_return
     }
 
 def plot_results(portfolio_df, qqq_main_df, initial_capital, actions_log, ma_col):
@@ -331,8 +334,8 @@ if run_button:
         
         col1, col2, col3, col4, col5 = st.columns(5)
         col1.metric("Final Portfolio Value", f"${metrics.get('Final Portfolio Value', 0):,.2f}")
-        col2.metric("Strategy CAGR", f"{metrics.get('CAGR', 0):.2%}")
-        col3.metric("QQQ CAGR", f"{metrics.get('QQQ CAGR', 0):.2%}")
+        col2.metric("Strategy Actual Return", f"{metrics.get('Actual Return', 0):.2%}")
+        col3.metric("QQQ Actual Return", f"{metrics.get('QQQ Actual Return', 0):.2%}")
         col4.metric("Max Drawdown", f"{metrics.get('Max Drawdown', 0):.2%}")
         col5.metric("Total Trades", metrics.get('Total Trades', 0))
 

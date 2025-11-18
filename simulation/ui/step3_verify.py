@@ -167,13 +167,13 @@ def _render_manual_configuration(defaults):
         with col2:
             manual_rsi_oversold = st.number_input(
                 "RSI Oversold (Buy)", min_value=10, max_value=50,
-                value=30, step=5,
+                value=defaults['rsi_oversold'], step=5,
                 help="Buy signal when RSI < oversold level"
             )
         with col3:
             manual_rsi_overbought = st.number_input(
                 "RSI Overbought (Sell)", min_value=50, max_value=90,
-                value=70, step=5,
+                value=defaults['rsi_overbought'], step=5,
                 help="Sell signal when RSI > overbought level"
             )
     else:
@@ -218,29 +218,29 @@ def _render_manual_configuration(defaults):
     
     # ATR Stop-Loss
     st.markdown("**Condition 5: ATR Stop-Loss (Optional)**")
-    manual_use_atr = st.checkbox("Enable ATR Stop-Loss", value=False)
+    manual_use_atr = st.checkbox("Enable ATR Stop-Loss", value=defaults['use_atr'])
     
     if manual_use_atr:
         st.info("💡 **ATR Multiplier Guide:** 1.5-2.0 = Day Trading | 2.0-3.0 = Swing Trading | 3.0-4.0 = Position Trading")
         col1, col2 = st.columns(2)
         with col1:
-            manual_atr_period = st.slider("ATR Period", min_value=5, max_value=30, value=14, step=1)
+            manual_atr_period = st.slider("ATR Period", min_value=5, max_value=30, value=defaults['atr_period'], step=1)
         with col2:
-            manual_atr_multiplier = st.slider("ATR Multiplier", min_value=1.0, max_value=4.0, value=2.0, step=0.25)
+            manual_atr_multiplier = st.slider("ATR Multiplier", min_value=1.0, max_value=4.0, value=defaults['atr_multiplier'], step=0.25)
     else:
         manual_atr_period = 14
         manual_atr_multiplier = 2.0
     
     # MSL/MSH Stop-Loss
     st.markdown("**Condition 6: MSL/MSH Stop-Loss (Optional)**")
-    manual_use_msl_msh = st.checkbox("Enable MSL/MSH Stop-Loss", value=False)
+    manual_use_msl_msh = st.checkbox("Enable MSL/MSH Stop-Loss", value=defaults['use_msl_msh'])
     
     if manual_use_msl_msh:
         col1, col2 = st.columns(2)
         with col1:
-            manual_msl_period = st.slider("MSL Smoothing Period", min_value=5, max_value=50, value=20, step=5)
+            manual_msl_period = st.slider("MSL Smoothing Period", min_value=5, max_value=50, value=defaults['msl_period'], step=5)
         with col2:
-            manual_msl_lookback = st.slider("MSL Lookback Period", min_value=3, max_value=20, value=5, step=1)
+            manual_msl_lookback = st.slider("MSL Lookback Period", min_value=3, max_value=20, value=defaults['msl_lookback'], step=1)
     else:
         manual_msl_period = 20
         manual_msl_lookback = 5

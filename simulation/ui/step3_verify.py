@@ -98,6 +98,13 @@ def _load_params_to_manual_config():
     st.session_state.manual_use_msl_msh = best_params.get('use_msl_msh', False)
     st.session_state.manual_msl_period = best_params.get('msl_period', 20)
     st.session_state.manual_msl_lookback = best_params.get('msl_lookback', 5)
+    st.session_state.manual_use_macd = best_params.get('use_macd', False)
+    st.session_state.manual_macd_fast = best_params.get('macd_fast', 12)
+    st.session_state.manual_macd_slow = best_params.get('macd_slow', 26)
+    st.session_state.manual_macd_signal_period = best_params.get('macd_signal_period', 9)
+    st.session_state.manual_use_adx = best_params.get('use_adx', False)
+    st.session_state.manual_adx_period = best_params.get('adx_period', 14)
+    st.session_state.manual_adx_threshold = best_params.get('adx_threshold', 25)
 
 
 def _get_manual_defaults():
@@ -123,7 +130,14 @@ def _get_manual_defaults():
         'atr_multiplier': st.session_state.manual_atr_multiplier,
         'use_msl_msh': st.session_state.manual_use_msl_msh,
         'msl_period': st.session_state.manual_msl_period,
-        'msl_lookback': st.session_state.manual_msl_lookback
+        'msl_lookback': st.session_state.manual_msl_lookback,
+        'use_macd': st.session_state.manual_use_macd,
+        'macd_fast': st.session_state.manual_macd_fast,
+        'macd_slow': st.session_state.manual_macd_slow,
+        'macd_signal_period': st.session_state.manual_macd_signal_period,
+        'use_adx': st.session_state.manual_use_adx,
+        'adx_period': st.session_state.manual_adx_period,
+        'adx_threshold': st.session_state.manual_adx_threshold
     }
 
 
@@ -244,6 +258,37 @@ def _render_manual_configuration(defaults):
     else:
         manual_msl_period = 20
         manual_msl_lookback = 5
+
+    # MACD Filter
+    st.markdown("**Condition 7: MACD Filter (Optional)**")
+    manual_use_macd = st.checkbox("Enable MACD Filter", value=defaults['use_macd'])
+    
+    if manual_use_macd:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            manual_macd_fast = st.number_input("MACD Fast", min_value=5, max_value=50, value=defaults['macd_fast'], step=1)
+        with col2:
+            manual_macd_slow = st.number_input("MACD Slow", min_value=10, max_value=100, value=defaults['macd_slow'], step=1)
+        with col3:
+            manual_macd_signal_period = st.number_input("MACD Signal", min_value=5, max_value=50, value=defaults['macd_signal_period'], step=1)
+    else:
+        manual_macd_fast = 12
+        manual_macd_slow = 26
+        manual_macd_signal_period = 9
+
+    # ADX Filter
+    st.markdown("**Condition 8: ADX Filter (Optional)**")
+    manual_use_adx = st.checkbox("Enable ADX Filter", value=defaults['use_adx'])
+
+    if manual_use_adx:
+        col1, col2 = st.columns(2)
+        with col1:
+            manual_adx_period = st.slider("ADX Period", min_value=5, max_value=30, value=defaults['adx_period'], step=1)
+        with col2:
+            manual_adx_threshold = st.slider("ADX Threshold", min_value=15, max_value=40, value=defaults['adx_threshold'], step=5)
+    else:
+        manual_adx_period = 14
+        manual_adx_threshold = 25
     
     return {
         'use_double_ema': manual_use_double_ema,
@@ -266,7 +311,14 @@ def _render_manual_configuration(defaults):
         'atr_multiplier': manual_atr_multiplier,
         'use_msl_msh': manual_use_msl_msh,
         'msl_period': manual_msl_period,
-        'msl_lookback': manual_msl_lookback
+        'msl_lookback': manual_msl_lookback,
+        'use_macd': manual_use_macd,
+        'macd_fast': manual_macd_fast,
+        'macd_slow': manual_macd_slow,
+        'macd_signal_period': manual_macd_signal_period,
+        'use_adx': manual_use_adx,
+        'adx_period': manual_adx_period,
+        'adx_threshold': manual_adx_threshold
     }
 
 
@@ -290,6 +342,12 @@ def _render_signal_summary(params):
     
     if params['use_bb']:
         buy_conditions.append(f"**Price in lower {params['bb_buy_threshold']*100:.0f}% of Bollinger Bands**")
+
+    if params.get('use_macd', False):
+        buy_conditions.append(f"**MACD crosses above Signal Line**")
+        
+    if params.get('use_adx', False):
+        buy_conditions.append(f"**ADX > {params['adx_threshold']} AND +DI > -DI (strong uptrend)**")
     
     # Build SELL conditions
     sell_conditions = []
@@ -312,6 +370,12 @@ def _render_signal_summary(params):
     
     if params['use_msl_msh']:
         sell_conditions.append(f"**MSL/MSH Stop-Loss triggered (Period: {params['msl_period']}, Lookback: {params['msl_lookback']})**")
+
+    if params.get('use_macd', False):
+        sell_conditions.append(f"**MACD crosses below Signal Line**")
+
+    if params.get('use_adx', False):
+        sell_conditions.append(f"**ADX < {params['adx_threshold']} OR +DI < -DI (weak or downtrend)**")
     
     col1, col2 = st.columns(2)
     
@@ -357,7 +421,14 @@ def _apply_manual_configuration(params):
         'msl_period': params['msl_period'],
         'msh_period': params['msl_period'],
         'msl_lookback': params['msl_lookback'],
-        'msh_lookback': params['msl_lookback']
+        'msh_lookback': params['msl_lookback'],
+        'use_macd': params.get('use_macd', False),
+        'macd_fast': params.get('macd_fast', 12),
+        'macd_slow': params.get('macd_slow', 26),
+        'macd_signal_period': params.get('macd_signal_period', 9),
+        'use_adx': params.get('use_adx', False),
+        'adx_period': params.get('adx_period', 14),
+        'adx_threshold': params.get('adx_threshold', 25)
     }
     
     st.session_state.best_params = params_to_apply

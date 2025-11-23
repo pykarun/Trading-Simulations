@@ -2,7 +2,8 @@
 import pandas as pd
 from .indicators import (
     calculate_ema, calculate_double_ema, calculate_rsi,
-    calculate_bollinger_bands, calculate_atr, calculate_msl_msh
+    calculate_bollinger_bands, calculate_atr, calculate_msl_msh,
+    calculate_macd, calculate_adx
 )
 
 
@@ -13,7 +14,9 @@ def run_tqqq_only_strategy(
     ema_slow=21, use_bb=False, bb_period=20, bb_std_dev=2.0,
     bb_buy_threshold=0.2, bb_sell_threshold=0.8, use_atr=False, atr_period=14,
     atr_multiplier=2.0, use_msl_msh=False, msl_period=20, msh_period=20,
-    msl_lookback=5, msh_lookback=5, use_ema=True
+    msl_lookback=5, msh_lookback=5, use_ema=True, use_macd=False,
+    macd_fast=12, macd_slow=26, macd_signal_period=9, use_adx=False,
+    adx_period=14, adx_threshold=25
 ):
     """Smart Leverage Strategy - TQQQ with EMA, RSI, Bollinger Bands & Stop-Loss.
     
@@ -72,6 +75,12 @@ def run_tqqq_only_strategy(
     if use_msl_msh:
         qqq_data = calculate_msl_msh(qqq_data, msl_period, msh_period, msl_lookback, msh_lookback)
         tqqq_data = calculate_msl_msh(tqqq_data, msl_period, msh_period, msl_lookback, msh_lookback)
+    
+    if use_macd:
+        qqq_data = calculate_macd(qqq_data, macd_fast, macd_slow, macd_signal_period)
+        
+    if use_adx:
+        qqq_data = calculate_adx(qqq_data, adx_period)
     
     sim_data = qqq_data[start_date:end_date].copy()
     
@@ -165,16 +174,35 @@ def run_tqqq_only_strategy(
         else:
             signal = base_signal
         
-        # Apply Bollinger Bands filter
+        # Apply filters that can turn a BUY signal into a SELL
+        if signal == 'BUY':
+            # Bollinger Bands buy filter
+            if use_bb:
+                bb_position = sim_data.iloc[i]['BB_Position']
+                if pd.notna(bb_position) and bb_position > bb_buy_threshold:
+                    signal = 'SELL'
+            
+            # MACD buy filter
+            if use_macd and signal == 'BUY':
+                macd_hist = sim_data.iloc[i].get('MACD_Hist', None)
+                if pd.notna(macd_hist) and macd_hist <= 0:
+                    signal = 'SELL'
+
+            # ADX buy filter
+            if use_adx and signal == 'BUY':
+                adx = sim_data.iloc[i].get('ADX', None)
+                plus_di = sim_data.iloc[i].get('+DI', None)
+                minus_di = sim_data.iloc[i].get('-DI', None)
+                if pd.notna(adx) and pd.notna(plus_di) and pd.notna(minus_di):
+                    if adx < adx_threshold or plus_di < minus_di:
+                        signal = 'SELL'
+
+        # Standalone SELL conditions that can override anything
         if use_bb:
             bb_position = sim_data.iloc[i]['BB_Position']
-            if pd.notna(bb_position):
-                if signal == 'BUY' and bb_position > bb_buy_threshold:
-                    signal = 'SELL'
-                elif signal == 'BUY' and bb_position >= bb_sell_threshold:
-                    signal = 'SELL'
-                elif position == 'TQQQ' and bb_position >= bb_sell_threshold:
-                    signal = 'SELL'
+            if pd.notna(bb_position) and position == 'TQQQ' and bb_position >= bb_sell_threshold:
+                signal = 'SELL'
+
         
         if stop_loss_triggered:
             signal = 'SELL'
@@ -227,6 +255,8 @@ def run_tqqq_only_strategy(
             'QQQ_Price': f'${qqq_close:.2f}',
             'QQQ_EMA': ema_display,
             'RSI': f'{rsi:.1f}' if pd.notna(rsi) else 'N/A',
+            'MACD_Hist': f'{sim_data.iloc[i].get("MACD_Hist", 0):.2f}' if use_macd else 'N/A',
+            'ADX': f'{sim_data.iloc[i].get("ADX", 0):.1f}' if use_adx else 'N/A',
             'Signal': signal_text,
             'TQQQ_Price': f'${tqqq_close:.2f}',
             'Shares': f'{shares:.2f}',

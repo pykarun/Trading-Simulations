@@ -6,7 +6,9 @@ from .indicators import (
     calculate_rsi,
     calculate_bollinger_bands,
     calculate_atr,
-    calculate_msl_msh
+    calculate_msl_msh,
+    calculate_macd,
+    calculate_adx
 )
 from .strategy import run_tqqq_only_strategy
 
@@ -18,5 +20,7 @@ __all__ = [
     'calculate_bollinger_bands',
     'calculate_atr',
     'calculate_msl_msh',
+    'calculate_macd',
+    'calculate_adx',
     'run_tqqq_only_strategy'
 ]

@@ -8,17 +8,12 @@ def setup_page():
         page_title="Leveraged ETF Trader",
         page_icon="🎯",
         layout="wide",
-        initial_sidebar_state="collapsed"
+        initial_sidebar_state="auto"
     )
     
     # Custom CSS for mobile optimization
     st.markdown("""
     <style>
-        /* Hide sidebar completely */
-        [data-testid="stSidebar"] {
-           display: none;
-        }
-        
         /* Fix header spacing - prevent overlap with deploy button */
         .block-container {
            padding-top: 3rem;

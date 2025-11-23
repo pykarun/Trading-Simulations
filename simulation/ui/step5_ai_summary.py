@@ -40,7 +40,6 @@ def render_step5():
     if not (has_daily_signal or has_custom_sim or has_monte_carlo):
         st.warning("⚠️ No test results available. Please run tests in Step 4 first.")
         st.markdown("---")
-        _render_navigation_buttons()
         return
     
     st.markdown("---")
@@ -57,7 +56,6 @@ def render_step5():
     
     if len(tabs) == 0:
         st.warning("No reports available.")
-        _render_navigation_buttons()
         return
     
     tab_objects = st.tabs(tabs)
@@ -77,6 +75,9 @@ def render_step5():
         with tab_objects[tab_idx]:
             _render_monte_carlo_report()
     
+    # Add bottom padding for mobile visibility
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
     # Navigation buttons
     _render_navigation_buttons()
 
@@ -190,6 +191,9 @@ def _render_monte_carlo_report():
     )
 
 
+
+
+
 def _render_navigation_buttons():
     """Render navigation buttons."""
     st.markdown("---")
@@ -211,6 +215,7 @@ def _render_navigation_buttons():
 
 
 def _generate_daily_signal_ai_summary(params, date, qqq_price, tqqq_price, ema, rsi, signal, market_state, ema_fast=None, ema_slow=None, bb_position=None):
+
     """Generate AI-friendly summary for daily signal."""
     
     summary = f"""

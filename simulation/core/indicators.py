@@ -137,3 +137,73 @@ def calculate_msl_msh(data, msl_period=20, msh_period=20, msl_lookback=5, msh_lo
     df['MSH_Distance'] = ((df['MSH'] - df['Close']) / df['Close']) * 100
     
     return df
+
+
+def calculate_macd(data, fast_period=12, slow_period=26, signal_period=9):
+    """Calculate MACD (Moving Average Convergence Divergence).
+    
+    Args:
+        data: DataFrame with 'Close' column
+        fast_period: Fast EMA period (default 12)
+        slow_period: Slow EMA period (default 26)
+        signal_period: Signal line EMA period (default 9)
+        
+    Returns:
+        DataFrame with added 'MACD', 'MACD_Signal', 'MACD_Hist' columns
+    """
+    df = data.copy()
+    
+    # Calculate Fast and Slow EMAs
+    ema_fast = df['Close'].ewm(span=fast_period, adjust=False).mean()
+    ema_slow = df['Close'].ewm(span=slow_period, adjust=False).mean()
+    
+    # Calculate MACD line
+    df['MACD'] = ema_fast - ema_slow
+    
+    # Calculate Signal line
+    df['MACD_Signal'] = df['MACD'].ewm(span=signal_period, adjust=False).mean()
+    
+    # Calculate MACD Histogram
+    df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
+    
+    return df
+
+
+def calculate_adx(data, period=14):
+    """Calculate ADX (Average Directional Index).
+    
+    Args:
+        data: DataFrame with 'High', 'Low', 'Close' columns
+        period: ADX period (default 14)
+        
+    Returns:
+        DataFrame with added 'ADX', '+DI', '-DI' columns
+    """
+    df = data.copy()
+    
+    df['H-L'] = df['High'] - df['Low']
+    df['H-PC'] = abs(df['High'] - df['Close'].shift(1))
+    df['L-PC'] = abs(df['Low'] - df['Close'].shift(1))
+    df['TR'] = df[['H-L', 'H-PC', 'L-PC']].max(axis=1)
+    
+    df['+DM'] = (df['High'] - df['High'].shift(1)).where((df['High'] - df['High'].shift(1)) > (df['Low'].shift(1) - df['Low']), 0)
+    df['-DM'] = (df['Low'].shift(1) - df['Low']).where((df['Low'].shift(1) - df['Low']) > (df['High'] - df['High'].shift(1)), 0)
+    
+    # Smoothed values
+    atr = df['TR'].ewm(alpha=1/period, adjust=False).mean()
+    plus_di = 100 * (df['+DM'].ewm(alpha=1/period, adjust=False).mean() / atr)
+    minus_di = 100 * (df['-DM'].ewm(alpha=1/period, adjust=False).mean() / atr)
+    
+    # DX and ADX
+    dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
+    dx = dx.fillna(0)  # Handle potential division by zero
+    adx = dx.ewm(alpha=1/period, adjust=False).mean()
+    
+    df['+DI'] = plus_di
+    df['-DI'] = minus_di
+    df['ADX'] = adx
+    
+    # Clean up temporary columns
+    df.drop(['H-L', 'H-PC', 'L-PC', 'TR', '+DM', '-DM'], axis=1, inplace=True, errors='ignore')
+    
+    return df

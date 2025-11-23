@@ -13,6 +13,7 @@ import numpy as np
 import datetime
 from collections import defaultdict
 import plotly.graph_objects as go
+import itertools
 
 from core import get_data, run_tqqq_only_strategy
 
@@ -52,12 +53,31 @@ def render_step2():
     test_multiple_periods = True
     
     # Feature Configuration
-    enable_ema, ema_config = _render_ema_section()
-    enable_rsi, rsi_config = _render_rsi_section()
-    enable_sl, sl_config = _render_stop_loss_section()
-    enable_bb, bb_config = _render_bollinger_bands_section()
-    enable_atr, atr_config = _render_atr_section()
-    enable_msl, msl_config = _render_msl_section()
+    st.markdown("---")
+    st.markdown("### ⚙️ Configure Strategy Features")
+    st.caption("Enable and configure the trading signals you want to test. The sections will stack on mobile devices.")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        enable_ema, ema_config = _render_ema_section()
+    with col2:
+        enable_rsi, rsi_config = _render_rsi_section()
+    with col3:
+        enable_sl, sl_config = _render_stop_loss_section()
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        enable_bb, bb_config = _render_bollinger_bands_section()
+    with col2:
+        enable_atr, atr_config = _render_atr_section()
+    with col3:
+        enable_msl, msl_config = _render_msl_section()
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        enable_macd, macd_config = _render_macd_section()
+    with col2:
+        enable_adx, adx_config = _render_adx_section()
     
     # Initial Capital
     st.markdown("---")
@@ -80,7 +100,8 @@ def render_step2():
             selected_periods, test_multiple_periods, grid_capital,
             enable_ema, ema_config, enable_rsi, rsi_config,
             enable_sl, sl_config, enable_bb, bb_config,
-            enable_atr, atr_config, enable_msl, msl_config
+            enable_atr, atr_config, enable_msl, msl_config,
+            enable_macd, macd_config, enable_adx, adx_config
         )
     
     # Display Results
@@ -130,278 +151,295 @@ def _render_time_period_selection():
 
 def _render_ema_section():
     """Render EMA configuration section."""
-    st.markdown("---")
-    col1, col2 = st.columns([1, 4])
-    
-    with col1:
-        enable_ema = st.checkbox("✅ Enable", value=True, key="enable_ema", help="Include EMA strategy in grid search")
-    with col2:
-        st.markdown("**📈 Section 2: EMA Strategy** - Trend-following indicator (Primary signal)")
-    
-    if not enable_ema:
-        st.caption("⚠️ EMA is disabled - strategy will not use EMA signals")
-        return False, {}
-    
-    with st.expander("⚙️ Configure EMA Parameters", expanded=True):
+    with st.container(border=True):
+        st.markdown("**📈 EMA Strategy** (Primary)")
+        enable_ema = st.checkbox("Enable EMA", value=True, key="enable_ema", help="Include EMA strategy in grid search")
+
+        if not enable_ema:
+            st.caption("⚠️ EMA is disabled.")
+            return False, {}
+
         ema_strategy_options = st.multiselect(
             "EMA Strategies",
             options=["Single EMA", "Double EMA Crossover"],
             default=["Single EMA", "Double EMA Crossover"],
             help="Single EMA: Price vs EMA | Double EMA: Fast/Slow crossover"
         )
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if "Single EMA" in ema_strategy_options:
-                ema_range = st.multiselect(
-                    "Single EMA Periods",
-                    options=[10, 20, 21, 30, 40, 50, 60, 80, 100],
-                    default=[21, 30, 50],
-                    help="Common: 21, 50, 80"
-                )
-            else:
-                ema_range = []
-        
-        with col2:
-            if "Double EMA Crossover" in ema_strategy_options:
-                fast_ema_range = st.multiselect(
-                    "Fast EMA",
-                    options=[5, 8, 9, 10, 12, 15, 20, 21],
-                    default=[9, 12, 21],
-                    help="Faster response"
-                )
-                slow_ema_range = st.multiselect(
-                    "Slow EMA",
-                    options=[15, 20, 21, 25, 30, 40, 50],
-                    default=[21, 30, 50],
-                    help="Smoother trend"
-                )
-            else:
-                fast_ema_range = []
-                slow_ema_range = []
-    
-    return True, {
-        'strategy_options': ema_strategy_options,
-        'ema_range': ema_range,
-        'fast_ema_range': fast_ema_range,
-        'slow_ema_range': slow_ema_range
-    }
+
+        if "Single EMA" in ema_strategy_options:
+            ema_range = st.multiselect(
+                "Single EMA Periods",
+                options=[10, 20, 21, 30, 40, 50, 60, 80, 100],
+                default=[21, 30, 50],
+                help="Common: 21, 50, 80"
+            )
+        else:
+            ema_range = []
+
+        if "Double EMA Crossover" in ema_strategy_options:
+            fast_ema_range = st.multiselect(
+                "Fast EMA",
+                options=[5, 8, 9, 10, 12, 15, 20, 21],
+                default=[9, 12, 21],
+                help="Faster response"
+            )
+            slow_ema_range = st.multiselect(
+                "Slow EMA",
+                options=[15, 20, 21, 25, 30, 40, 50],
+                default=[21, 30, 50],
+                help="Smoother trend"
+            )
+        else:
+            fast_ema_range = []
+            slow_ema_range = []
+
+        return enable_ema, {
+            'strategy_options': ema_strategy_options,
+            'ema_range': ema_range,
+            'fast_ema_range': fast_ema_range,
+            'slow_ema_range': slow_ema_range
+        }
 
 
 def _render_rsi_section():
     """Render RSI configuration section."""
-    st.markdown("---")
-    col1, col2 = st.columns([1, 4])
-    
-    with col1:
-        enable_rsi = st.checkbox("✅ Enable", value=True, key="enable_rsi", help="Include RSI filter in grid search")
-    with col2:
-        st.markdown("**🎯 Section 3: RSI Filter** - Momentum & overbought/oversold signals (Optional)")
-    
-    if not enable_rsi:
-        st.caption("⚠️ RSI is disabled - will not use RSI filtering")
-        return False, {}
-    
-    with st.expander("⚙️ Configure RSI Parameters", expanded=True):
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            rsi_range = st.multiselect(
-                "Momentum (0=off)",
-                options=[0, 40, 45, 50, 55, 60],
-                default=[0, 50],
-                help="Buy when RSI > threshold"
-            )
-        
-        with col2:
-            rsi_oversold_range = st.multiselect(
-                "Oversold (Buy)",
-                options=[20, 25, 30, 35, 40],
-                default=[30],
-                help="Buy signal level"
-            )
-        
-        with col3:
-            rsi_overbought_range = st.multiselect(
-                "Overbought (Sell)",
-                options=[60, 65, 70, 75, 80],
-                default=[70],
-                help="Sell signal level"
-            )
-    
-    return True, {
-        'rsi_range': rsi_range,
-        'rsi_oversold_range': rsi_oversold_range,
-        'rsi_overbought_range': rsi_overbought_range
-    }
+    with st.container(border=True):
+        st.markdown("**🎯 RSI Filter** (Optional)")
+        enable_rsi = st.checkbox("Enable RSI", value=True, key="enable_rsi", help="Include RSI filter in grid search")
+
+        if not enable_rsi:
+            st.caption("⚠️ RSI is disabled.")
+            return False, {}
+
+        rsi_range = st.multiselect(
+            "Momentum (0=off)",
+            options=[0, 40, 45, 50, 55, 60],
+            default=[0, 50],
+            help="Buy when RSI > threshold"
+        )
+
+        rsi_oversold_range = st.multiselect(
+            "Oversold (Buy)",
+            options=[20, 25, 30, 35, 40],
+            default=[30],
+            help="Buy signal level"
+        )
+
+        rsi_overbought_range = st.multiselect(
+            "Overbought (Sell)",
+            options=[60, 65, 70, 75, 80],
+            default=[70],
+            help="Sell signal level"
+        )
+
+        return enable_rsi, {
+            'rsi_range': rsi_range,
+            'rsi_oversold_range': rsi_oversold_range,
+            'rsi_overbought_range': rsi_overbought_range
+        }
 
 
 def _render_stop_loss_section():
     """Render Stop-Loss configuration section."""
-    st.markdown("---")
-    col1, col2 = st.columns([1, 4])
-    
-    with col1:
-        enable_sl = st.checkbox("✅ Enable", value=True, key="enable_sl", help="Include stop-loss in grid search")
-    with col2:
-        st.markdown("**🛡️ Section 4: Stop-Loss** - Exit when portfolio drops X% from peak (Risk management)")
-    
-    if not enable_sl:
-        st.caption("⚠️ Stop-Loss disabled - will test without stop-loss only")
-        return False, {}
-    
-    with st.expander("⚙️ Configure Stop-Loss Parameters", expanded=True):
+    with st.container(border=True):
+        st.markdown("**🛡️ Stop-Loss** (Risk Mgmt)")
+        enable_sl = st.checkbox("Enable Stop-Loss", value=True, key="enable_sl", help="Include stop-loss in grid search")
+
+        if not enable_sl:
+            st.caption("⚠️ Stop-Loss is disabled.")
+            return False, {}
+
         stop_loss_range = st.multiselect(
             "Stop-Loss % (0=disabled)",
             options=[0, 5, 8, 10, 12, 15, 20],
             default=[0, 10, 15],
             help="Exit if portfolio drops X% from peak"
         )
-    
-    return True, {'stop_loss_range': stop_loss_range}
+
+        return enable_sl, {'stop_loss_range': stop_loss_range}
 
 
 def _render_bollinger_bands_section():
     """Render Bollinger Bands configuration section."""
-    st.markdown("---")
-    col1, col2 = st.columns([1, 4])
-    
-    with col1:
-        enable_bb = st.checkbox("✅ Enable", value=False, key="enable_bb", help="Include Bollinger Bands in grid search")
-    with col2:
-        st.markdown("**📊 Section 5: Bollinger Bands** - Volatility filter for entry/exit timing (Optional)")
-    
-    if not enable_bb:
-        st.caption("⚠️ Bollinger Bands disabled - will not use BB filtering")
-        return False, {}
-    
-    with st.expander("⚙️ Configure Bollinger Bands Parameters", expanded=True):
-        st.caption("Will test both with and without BB filter")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Band Configuration:**")
-            bb_period_range = st.multiselect(
-                "BB Period",
-                options=[10, 15, 20, 25, 30],
-                default=[20],
-                help="Moving average period (20 is standard)"
-            )
-            bb_std_dev_range = st.multiselect(
-                "BB Standard Deviation",
-                options=[1.5, 2.0, 2.5],
-                default=[2.0],
-                help="Band width (2.0 is standard)"
-            )
-        
-        with col2:
-            st.markdown("**Entry/Exit Thresholds:**")
-            bb_buy_threshold_range = st.multiselect(
-                "Buy Threshold",
-                options=[0.0, 0.1, 0.2, 0.3],
-                default=[0.2],
-                help="Buy when price in lower X%"
-            )
-            bb_sell_threshold_range = st.multiselect(
-                "Sell Threshold",
-                options=[0.7, 0.8, 0.9, 1.0],
-                default=[0.8],
-                help="Sell when price in upper X%"
-            )
-    
-    return True, {
-        'bb_period_range': bb_period_range,
-        'bb_std_dev_range': bb_std_dev_range,
-        'bb_buy_threshold_range': bb_buy_threshold_range,
-        'bb_sell_threshold_range': bb_sell_threshold_range
-    }
+    with st.container(border=True):
+        st.markdown("**📊 Bollinger Bands** (Optional)")
+        enable_bb = st.checkbox("Enable BBands", value=False, key="enable_bb", help="Include Bollinger Bands in grid search")
+
+        if not enable_bb:
+            st.caption("⚠️ BBands are disabled.")
+            return False, {}
+
+        st.caption("Tests with/without BB filter")
+
+        bb_period_range = st.multiselect(
+            "BB Period",
+            options=[10, 15, 20, 25, 30],
+            default=[20],
+            help="Moving average period (20 is standard)"
+        )
+        bb_std_dev_range = st.multiselect(
+            "BB Std Dev",
+            options=[1.5, 2.0, 2.5],
+            default=[2.0],
+            help="Band width (2.0 is standard)"
+        )
+        bb_buy_threshold_range = st.multiselect(
+            "Buy Threshold",
+            options=[0.0, 0.1, 0.2, 0.3],
+            default=[0.2],
+            help="Buy when price in lower X%"
+        )
+        bb_sell_threshold_range = st.multiselect(
+            "Sell Threshold",
+            options=[0.7, 0.8, 0.9, 1.0],
+            default=[0.8],
+            help="Sell when price in upper X%"
+        )
+
+        return enable_bb, {
+            'bb_period_range': bb_period_range,
+            'bb_std_dev_range': bb_std_dev_range,
+            'bb_buy_threshold_range': bb_buy_threshold_range,
+            'bb_sell_threshold_range': bb_sell_threshold_range
+        }
 
 
 def _render_atr_section():
     """Render ATR configuration section."""
-    st.markdown("---")
-    col1, col2 = st.columns([1, 4])
-    
-    with col1:
-        enable_atr = st.checkbox("✅ Enable", value=False, key="enable_atr", help="Include ATR stop-loss in grid search")
-    with col2:
-        st.markdown("**🎢 Section 6: ATR Stop-Loss** - Dynamic stop-loss that adapts to volatility (Optional)")
-    
-    if not enable_atr:
-        st.caption("⚠️ ATR Stop-Loss disabled - will not use ATR-based stops")
-        return False, {}
-    
-    with st.expander("⚙️ Configure ATR Parameters", expanded=True):
-        st.caption("Will test both with and without ATR stop-loss")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            atr_period_range = st.multiselect(
-                "ATR Period",
-                options=[7, 10, 14, 20, 30],
-                default=[14],
-                help="Period for calculating Average True Range (14 is standard)"
-            )
-        with col2:
-            atr_multiplier_range = st.multiselect(
-                "ATR Multiplier (Trading Style)",
-                options=[1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
-                default=[2.0, 2.5],
-                help="1.5-2.0 = Day Trading | 2.0-3.0 = Swing Trading | 3.0-4.0 = Position Trading"
-            )
-    
-    return True, {
-        'atr_period_range': atr_period_range,
-        'atr_multiplier_range': atr_multiplier_range
-    }
+    with st.container(border=True):
+        st.markdown("**🎢 ATR Stop-Loss** (Optional)")
+        enable_atr = st.checkbox("Enable ATR", value=False, key="enable_atr", help="Include ATR stop-loss in grid search")
+
+        if not enable_atr:
+            st.caption("⚠️ ATR Stop-Loss is disabled.")
+            return False, {}
+
+        st.caption("Tests with/without ATR stop")
+
+        atr_period_range = st.multiselect(
+            "ATR Period",
+            options=[7, 10, 14, 20, 30],
+            default=[14],
+            help="Period for ATR (14 is standard)"
+        )
+        atr_multiplier_range = st.multiselect(
+            "ATR Multiplier",
+            options=[1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
+            default=[2.0, 2.5],
+            help="1.5-2.0 Day Trading, 2.0-3.0 Swing, 3.0-4.0 Position"
+        )
+
+        return enable_atr, {
+            'atr_period_range': atr_period_range,
+            'atr_multiplier_range': atr_multiplier_range
+        }
 
 
 def _render_msl_section():
     """Render MSL/MSH configuration section."""
-    st.markdown("---")
-    col1, col2 = st.columns([1, 4])
-    
-    with col1:
-        enable_msl = st.checkbox("✅ Enable", value=False, key="enable_msl", help="Include MSL/MSH stop-loss in grid search")
-    with col2:
-        st.markdown("**📉 Section 7: MSL/MSH Stop-Loss** - Trend-following exit strategy (Optional)")
-    
-    if not enable_msl:
-        st.caption("⚠️ MSL/MSH Stop-Loss disabled - will not use MSL/MSH-based stops")
-        return False, {}
-    
-    with st.expander("⚙️ Configure MSL/MSH Parameters", expanded=True):
-        st.caption("Will test both with and without MSL/MSH stop-loss")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            msl_period_range = st.multiselect(
-                "MSL Smoothing Period",
-                options=[10, 15, 20, 25, 30],
-                default=[20],
-                help="Period for smoothing the moving stop-loss line"
-            )
-        with col2:
-            msl_lookback_range = st.multiselect(
-                "MSL Lookback Period",
-                options=[3, 5, 7, 10, 15],
-                default=[5],
-                help="Lookback period for calculating stop-loss levels"
-            )
-    
-    return True, {
-        'msl_period_range': msl_period_range,
-        'msl_lookback_range': msl_lookback_range
-    }
+    with st.container(border=True):
+        st.markdown("**📉 MSL/MSH Stop-Loss** (Optional)")
+        enable_msl = st.checkbox("Enable MSL/MSH", value=False, key="enable_msl", help="Include MSL/MSH stop-loss in grid search")
+
+        if not enable_msl:
+            st.caption("⚠️ MSL/MSH is disabled.")
+            return False, {}
+
+        st.caption("Tests with/without MSL/MSH stop")
+
+        msl_period_range = st.multiselect(
+            "MSL Smoothing",
+            options=[10, 15, 20, 25, 30],
+            default=[20],
+            help="Smoothing period for moving stop-loss"
+        )
+        msl_lookback_range = st.multiselect(
+            "MSL Lookback",
+            options=[3, 5, 7, 10, 15],
+            default=[5],
+            help="Lookback for stop-loss levels"
+        )
+
+        return enable_msl, {
+            'msl_period_range': msl_period_range,
+            'msl_lookback_range': msl_lookback_range
+        }
+
+
+def _render_macd_section():
+    """Render MACD configuration section."""
+    with st.container(border=True):
+        st.markdown("**📈 MACD Filter** (Optional)")
+        enable_macd = st.checkbox("Enable MACD", value=False, key="enable_macd", help="Include MACD filter in grid search")
+
+        if not enable_macd:
+            st.caption("⚠️ MACD is disabled.")
+            return False, {}
+
+        st.caption("Tests with/without MACD filter. Buy if MACD > Signal.")
+
+        macd_fast_range = st.multiselect(
+            "MACD Fast",
+            options=[9, 10, 12, 15],
+            default=[12],
+            help="Fast EMA (12 is standard)"
+        )
+        macd_slow_range = st.multiselect(
+            "MACD Slow",
+            options=[20, 21, 25, 26],
+            default=[26],
+            help="Slow EMA (26 is standard)"
+        )
+        macd_signal_range = st.multiselect(
+            "MACD Signal",
+            options=[7, 8, 9, 10],
+            default=[9],
+            help="Signal line EMA (9 is standard)"
+        )
+
+        return enable_macd, {
+            'macd_fast_range': macd_fast_range,
+            'macd_slow_range': macd_slow_range,
+            'macd_signal_range': macd_signal_range,
+        }
+
+def _render_adx_section():
+    """Render ADX configuration section."""
+    with st.container(border=True):
+        st.markdown("**💪 ADX Filter** (Optional)")
+        enable_adx = st.checkbox("Enable ADX", value=False, key="enable_adx", help="Include ADX filter in grid search")
+
+        if not enable_adx:
+            st.caption("⚠️ ADX is disabled.")
+            return False, {}
+
+        st.caption("Tests with/without ADX filter. Buy if ADX > threshold & +DI > -DI.")
+
+        adx_period_range = st.multiselect(
+            "ADX Period",
+            options=[10, 12, 14, 20],
+            default=[14],
+            help="ADX period (14 is standard)"
+        )
+        adx_threshold_range = st.multiselect(
+            "ADX Threshold",
+            options=[20, 25, 30],
+            default=[25],
+            help="Min ADX for trend (25 is standard)"
+        )
+
+        return enable_adx, {
+            'adx_period_range': adx_period_range,
+            'adx_threshold_range': adx_threshold_range,
+        }
 
 
 def _execute_grid_search(
     selected_periods, test_multiple_periods, grid_capital,
     enable_ema, ema_config, enable_rsi, rsi_config,
     enable_sl, sl_config, enable_bb, bb_config,
-    enable_atr, atr_config, enable_msl, msl_config
+    enable_atr, atr_config, enable_msl, msl_config,
+    enable_macd, macd_config, enable_adx, adx_config
 ):
     """Execute the grid search with given parameters."""
     
@@ -418,7 +456,8 @@ def _execute_grid_search(
     param_combinations = _generate_param_combinations(
         enable_ema, ema_config, enable_rsi, rsi_config,
         enable_sl, sl_config, enable_bb, bb_config,
-        enable_atr, atr_config, enable_msl, msl_config
+        enable_atr, atr_config, enable_msl, msl_config,
+        enable_macd, macd_config, enable_adx, adx_config
     )
     
     # Determine periods to test
@@ -497,7 +536,14 @@ def _execute_grid_search(
                     params['msh_period'],
                     params['msl_lookback'],
                     params['msh_lookback'],
-                    params.get('use_ema', True)
+                    params.get('use_ema', True),
+                    params['use_macd'],
+                    params['macd_fast'],
+                    params['macd_slow'],
+                    params['macd_signal_period'],
+                    params['use_adx'],
+                    params['adx_period'],
+                    params['adx_threshold']
                 )
                 
                 # Calculate metrics
@@ -561,98 +607,119 @@ def _execute_grid_search(
 def _generate_param_combinations(
     enable_ema, ema_config, enable_rsi, rsi_config,
     enable_sl, sl_config, enable_bb, bb_config,
-    enable_atr, atr_config, enable_msl, msl_config
+    enable_atr, atr_config, enable_msl, msl_config,
+    enable_macd, macd_config, enable_adx, adx_config
 ):
-    """Generate all parameter combinations for grid search."""
+    """Generate all parameter combinations for grid search using itertools."""
     
     param_combinations = []
-    use_ema_enabled = enable_ema and len(ema_config.get('strategy_options', [])) > 0
+
+    # EMA base parameters
+    ema_strategy_params = []
+    if enable_ema:
+        if "Single EMA" in ema_config.get('strategy_options', []):
+            for ema in ema_config['ema_range']:
+                ema_strategy_params.append({'use_double_ema': False, 'ema_period': ema, 'ema_fast': 9, 'ema_slow': 21})
+        
+        if "Double EMA Crossover" in ema_config.get('strategy_options', []):
+            for fast in ema_config['fast_ema_range']:
+                for slow in ema_config['slow_ema_range']:
+                    if fast < slow:
+                        ema_strategy_params.append({'use_double_ema': True, 'ema_period': slow, 'ema_fast': fast, 'ema_slow': slow})
+    else:
+        # If EMA is disabled, create a single placeholder
+        ema_strategy_params.append({'use_double_ema': False, 'ema_period': 50, 'ema_fast': 9, 'ema_slow': 21})
+
+    # Prepare iterables for all other parameters
+    rsi_params = list(itertools.product(
+        rsi_config.get('rsi_range', [0]) if enable_rsi else [0],
+        rsi_config.get('rsi_oversold_range', [30]) if enable_rsi else [30],
+        rsi_config.get('rsi_overbought_range', [70]) if enable_rsi else [70]
+    ))
     
-    # Get ranges
-    rsi_range = rsi_config.get('rsi_range', [0]) if enable_rsi else [0]
-    rsi_oversold_range = rsi_config.get('rsi_oversold_range', [30]) if enable_rsi else [30]
-    rsi_overbought_range = rsi_config.get('rsi_overbought_range', [70]) if enable_rsi else [70]
-    stop_loss_range = sl_config.get('stop_loss_range', [0]) if enable_sl else [0]
+    sl_params = sl_config.get('stop_loss_range', [0]) if enable_sl else [0]
     
-    bb_enabled_options = ["Disabled", "Enabled"] if enable_bb else ["Disabled"]
-    atr_enabled_options = ["Disabled", "Enabled"] if enable_atr else ["Disabled"]
-    msl_enabled_options = ["Disabled", "Enabled"] if enable_msl else ["Disabled"]
+    bb_params = list(itertools.product(
+        ["Enabled", "Disabled"] if enable_bb else ["Disabled"],
+        bb_config.get('bb_period_range', [20]) if enable_bb else [20],
+        bb_config.get('bb_std_dev_range', [2.0]) if enable_bb else [2.0],
+        bb_config.get('bb_buy_threshold_range', [0.2]) if enable_bb else [0.2],
+        bb_config.get('bb_sell_threshold_range', [0.8]) if enable_bb else [0.8]
+    ))
+
+    atr_params = list(itertools.product(
+        ["Enabled", "Disabled"] if enable_atr else ["Disabled"],
+        atr_config.get('atr_period_range', [14]) if enable_atr else [14],
+        atr_config.get('atr_multiplier_range', [2.0]) if enable_atr else [2.0]
+    ))
+
+    msl_params = list(itertools.product(
+        ["Enabled", "Disabled"] if enable_msl else ["Disabled"],
+        msl_config.get('msl_period_range', [20]) if enable_msl else [20],
+        msl_config.get('msl_lookback_range', [5]) if enable_msl else [5]
+    ))
     
-    # Single EMA combinations
-    if "Single EMA" in ema_config.get('strategy_options', []):
-        for ema in ema_config['ema_range']:
-            _add_combinations(
-                param_combinations, use_ema_enabled, False, ema, 9, 21,
-                rsi_range, rsi_oversold_range, rsi_overbought_range, stop_loss_range,
-                bb_enabled_options, bb_config, atr_enabled_options, atr_config,
-                msl_enabled_options, msl_config
-            )
-    
-    # Double EMA combinations
-    if "Double EMA Crossover" in ema_config.get('strategy_options', []):
-        for fast in ema_config['fast_ema_range']:
-            for slow in ema_config['slow_ema_range']:
-                if fast >= slow:
-                    continue
-                _add_combinations(
-                    param_combinations, use_ema_enabled, True, slow, fast, slow,
-                    rsi_range, rsi_oversold_range, rsi_overbought_range, stop_loss_range,
-                    bb_enabled_options, bb_config, atr_enabled_options, atr_config,
-                    msl_enabled_options, msl_config
-                )
-    
+    macd_params = list(itertools.product(
+        ["Enabled", "Disabled"] if enable_macd else ["Disabled"],
+        macd_config.get('macd_fast_range', [12]) if enable_macd else [12],
+        macd_config.get('macd_slow_range', [26]) if enable_macd else [26],
+        macd_config.get('macd_signal_range', [9]) if enable_macd else [9]
+    ))
+
+    adx_params = list(itertools.product(
+        ["Enabled", "Disabled"] if enable_adx else ["Disabled"],
+        adx_config.get('adx_period_range', [14]) if enable_adx else [14],
+        adx_config.get('adx_threshold_range', [25]) if enable_adx else [25]
+    ))
+
+    # Combine all parameter sets
+    all_combinations = itertools.product(
+        ema_strategy_params, rsi_params, sl_params, bb_params,
+        atr_params, msl_params, macd_params, adx_params
+    )
+
+    for combo in all_combinations:
+        ema_p, rsi_p, sl_p, bb_p, atr_p, msl_p, macd_p, adx_p = combo
+
+        use_bb = bb_p[0] == "Enabled"
+        use_atr = atr_p[0] == "Enabled"
+        use_msl = msl_p[0] == "Enabled"
+        use_macd = macd_p[0] == "Enabled"
+        use_adx = adx_p[0] == "Enabled"
+
+        param_dict = _create_param_dict(
+            use_ema=enable_ema,
+            use_double_ema=ema_p['use_double_ema'],
+            ema_period=ema_p['ema_period'],
+            ema_fast=ema_p['ema_fast'],
+            ema_slow=ema_p['ema_slow'],
+            rsi=rsi_p[0],
+            rsi_oversold=rsi_p[1],
+            rsi_overbought=rsi_p[2],
+            sl=sl_p,
+            use_bb=use_bb,
+            bb_period=bb_p[1],
+            bb_std=bb_p[2],
+            bb_buy=bb_p[3],
+            bb_sell=bb_p[4],
+            use_atr=use_atr,
+            atr_period=atr_p[1],
+            atr_mult=atr_p[2],
+            use_msl_msh=use_msl,
+            msl_period=msl_p[1],
+            msl_lookback=msl_p[2],
+            use_macd=use_macd,
+            macd_fast=macd_p[1],
+            macd_slow=macd_p[2],
+            macd_signal=macd_p[3],
+            use_adx=use_adx,
+            adx_period=adx_p[1],
+            adx_thresh=adx_p[2]
+        )
+        param_combinations.append(param_dict)
+        
     return param_combinations
 
-
-def _add_combinations(
-    param_combinations, use_ema, use_double_ema, ema_period, ema_fast, ema_slow,
-    rsi_range, rsi_oversold_range, rsi_overbought_range, stop_loss_range,
-    bb_enabled_options, bb_config, atr_enabled_options, atr_config,
-    msl_enabled_options, msl_config
-):
-    """Add parameter combinations to the list."""
-    
-    for rsi in rsi_range:
-        for rsi_oversold in rsi_oversold_range:
-            for rsi_overbought in rsi_overbought_range:
-                for sl in stop_loss_range:
-                    for bb_enabled in bb_enabled_options:
-                        for atr_enabled in atr_enabled_options:
-                            for msl_enabled in msl_enabled_options:
-                                use_bb = (bb_enabled == "Enabled")
-                                use_atr = (atr_enabled == "Enabled")
-                                use_msl_msh = (msl_enabled == "Enabled")
-                                
-                                # Get parameter ranges
-                                atr_params = atr_config.get('atr_period_range', [14]) if use_atr else [14]
-                                atr_mult_params = atr_config.get('atr_multiplier_range', [2.0]) if use_atr else [2.0]
-                                msl_params = msl_config.get('msl_period_range', [20]) if use_msl_msh else [20]
-                                msl_look_params = msl_config.get('msl_lookback_range', [5]) if use_msl_msh else [5]
-                                
-                                for atr_period in atr_params:
-                                    for atr_mult in atr_mult_params:
-                                        for msl_period in msl_params:
-                                            for msl_lookback in msl_look_params:
-                                                if use_bb:
-                                                    for bb_period in bb_config.get('bb_period_range', [20]):
-                                                        for bb_std in bb_config.get('bb_std_dev_range', [2.0]):
-                                                            for bb_buy in bb_config.get('bb_buy_threshold_range', [0.2]):
-                                                                for bb_sell in bb_config.get('bb_sell_threshold_range', [0.8]):
-                                                                    param_combinations.append(_create_param_dict(
-                                                                        use_ema, use_double_ema, ema_period, ema_fast, ema_slow,
-                                                                        rsi, rsi_oversold, rsi_overbought, sl,
-                                                                        True, bb_period, bb_std, bb_buy, bb_sell,
-                                                                        use_atr, atr_period, atr_mult,
-                                                                        use_msl_msh, msl_period, msl_lookback
-                                                                    ))
-                                                else:
-                                                    param_combinations.append(_create_param_dict(
-                                                        use_ema, use_double_ema, ema_period, ema_fast, ema_slow,
-                                                        rsi, rsi_oversold, rsi_overbought, sl,
-                                                        False, 20, 2.0, 0.2, 0.8,
-                                                        use_atr, atr_period, atr_mult,
-                                                        use_msl_msh, msl_period, msl_lookback
-                                                    ))
 
 
 def _create_param_dict(
@@ -660,7 +727,9 @@ def _create_param_dict(
     rsi, rsi_oversold, rsi_overbought, sl,
     use_bb, bb_period, bb_std, bb_buy, bb_sell,
     use_atr, atr_period, atr_mult,
-    use_msl_msh, msl_period, msl_lookback
+    use_msl_msh, msl_period, msl_lookback,
+    use_macd, macd_fast, macd_slow, macd_signal,
+    use_adx, adx_period, adx_thresh
 ):
     """Create a parameter dictionary."""
     return {
@@ -687,7 +756,14 @@ def _create_param_dict(
         'msl_period': msl_period,
         'msh_period': msl_period,
         'msl_lookback': msl_lookback,
-        'msh_lookback': msl_lookback
+        'msh_lookback': msl_lookback,
+        'use_macd': use_macd,
+        'macd_fast': macd_fast,
+        'macd_slow': macd_slow,
+        'macd_signal_period': macd_signal,
+        'use_adx': use_adx,
+        'adx_period': adx_period,
+        'adx_threshold': adx_thresh
     }
 
 
@@ -712,6 +788,12 @@ def _build_param_string(params, period_name=None):
     
     if params['use_msl_msh']:
         param_str += f" | MSL({params['msl_period']},{params['msl_lookback']})"
+        
+    if params.get('use_macd', False):
+        param_str += f" | MACD({params['macd_fast']},{params['macd_slow']},{params['macd_signal_period']})"
+        
+    if params.get('use_adx', False):
+        param_str += f" | ADX({params['adx_period']},{params['adx_threshold']})"
     
     if period_name:
         param_str = f"[{period_name}] {param_str}"
@@ -749,19 +831,19 @@ def _display_grid_search_results(selected_periods, test_multiple_periods):
                 del st.session_state[key]
         st.success("Cleared!")
         rerun()
-    
+
     # Navigation buttons
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 1, 1])
-    
+
     with col1:
         if st.button("⬅️ Previous Step", use_container_width=True, key="step2_prev"):
             st.session_state.wizard_step = 1
             rerun()
-    
+
     with col2:
         pass  # Empty middle column for spacing
-    
+
     with col3:
         if st.button("Next Step ➡️", type="primary", use_container_width=True, key="step2_next"):
             if st.session_state.get('best_params') is not None:
@@ -769,7 +851,7 @@ def _display_grid_search_results(selected_periods, test_multiple_periods):
                 rerun()
             else:
                 st.warning("⚠️ Please find best signals and apply a strategy first!")
-    
+
     # Add bottom padding for mobile visibility
     st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -820,6 +902,12 @@ def _display_top_10_results(sorted_results):
                     
                     if params['use_msl_msh']:
                         strategy_desc += f" + MSL/MSH"
+
+                    if params.get('use_macd', False):
+                        strategy_desc += f" + MACD"
+                    
+                    if params.get('use_adx', False):
+                        strategy_desc += f" + ADX"
                     
                     # Apply parameters
                     st.session_state.best_params = params.copy()
@@ -1011,6 +1099,12 @@ def _display_robust_strategies(results, selected_periods):
                     
                     if params['use_msl_msh']:
                         strategy_desc += f" + MSL/MSH"
+
+                    if params.get('use_macd', False):
+                        strategy_desc += f" + MACD"
+                    
+                    if params.get('use_adx', False):
+                        strategy_desc += f" + ADX"
                     
                     # Apply parameters
                     st.session_state.best_params = params.copy()

@@ -16,7 +16,7 @@ import yfinance as yf
 from curl_cffi import requests
 import plotly.graph_objects as go
 
-from core import get_data, run_tqqq_only_strategy, calculate_double_ema, calculate_ema, calculate_rsi, calculate_bollinger_bands
+from core import get_data, run_tqqq_only_strategy, calculate_double_ema, calculate_ema, calculate_rsi, calculate_bollinger_bands, calculate_macd, calculate_adx
 from utils import show_applied_params_banner, create_performance_chart
 
 try:
@@ -129,6 +129,13 @@ def _load_testing_params():
     st.session_state.msh_period = best_params.get('msh_period', 20)
     st.session_state.msl_lookback = best_params.get('msl_lookback', 5)
     st.session_state.msh_lookback = best_params.get('msh_lookback', 5)
+    st.session_state.use_macd = best_params.get('use_macd', False)
+    st.session_state.macd_fast = best_params.get('macd_fast', 12)
+    st.session_state.macd_slow = best_params.get('macd_slow', 26)
+    st.session_state.macd_signal_period = best_params.get('macd_signal_period', 9)
+    st.session_state.use_adx = best_params.get('use_adx', False)
+    st.session_state.adx_period = best_params.get('adx_period', 14)
+    st.session_state.adx_threshold = best_params.get('adx_threshold', 25)
 
 
 def _get_loaded_params():
@@ -157,7 +164,14 @@ def _get_loaded_params():
         'msl_period': st.session_state.msl_period,
         'msh_period': st.session_state.msh_period,
         'msl_lookback': st.session_state.msl_lookback,
-        'msh_lookback': st.session_state.msh_lookback
+        'msh_lookback': st.session_state.msh_lookback,
+        'use_macd': st.session_state.use_macd,
+        'macd_fast': st.session_state.macd_fast,
+        'macd_slow': st.session_state.macd_slow,
+        'macd_signal_period': st.session_state.macd_signal_period,
+        'use_adx': st.session_state.use_adx,
+        'adx_period': st.session_state.adx_period,
+        'adx_threshold': st.session_state.adx_threshold
     }
 
 
@@ -204,6 +218,16 @@ def _display_current_configuration(params):
         strategy_summary.append(f"**MSL/MSH:** Enabled ({params['msl_period']},{params['msl_lookback']})")
     else:
         strategy_summary.append("**MSL/MSH:** Disabled")
+
+    if params.get('use_macd', False):
+        strategy_summary.append(f"**MACD:** Enabled ({params['macd_fast']},{params['macd_slow']},{params['macd_signal_period']})")
+    else:
+        strategy_summary.append("**MACD:** Disabled")
+
+    if params.get('use_adx', False):
+        strategy_summary.append(f"**ADX:** Enabled ({params['adx_period']},{params['adx_threshold']})")
+    else:
+        strategy_summary.append("**ADX:** Disabled")
     
     st.info(" | ".join(strategy_summary))
 
@@ -346,6 +370,12 @@ def _run_daily_signal(params):
             
             if params['use_bb']:
                 qqq_data = calculate_bollinger_bands(qqq_data, params['bb_period'], params['bb_std_dev'])
+
+            if params.get('use_macd', False):
+                qqq_data = calculate_macd(qqq_data, params['macd_fast'], params['macd_slow'], params['macd_signal_period'])
+
+            if params.get('use_adx', False):
+                qqq_data = calculate_adx(qqq_data, params['adx_period'])
             
             latest_date = qqq_data.index[-1]
             latest_qqq_close = qqq_data.iloc[-1]['Close']
@@ -374,14 +404,34 @@ def _run_daily_signal(params):
             else:
                 final_signal = base_signal
             
-            # Apply BB filter
+            # Apply filters that can turn a BUY signal into a SELL
+            if final_signal == 'BUY':
+                # BB buy filter
+                if params['use_bb']:
+                    latest_bb_position = qqq_data.iloc[-1]['BB_Position']
+                    if pd.notna(latest_bb_position) and latest_bb_position > params['bb_buy_threshold']:
+                        final_signal = 'SELL'
+                
+                # MACD buy filter
+                if params.get('use_macd', False) and final_signal == 'BUY':
+                    macd_hist = qqq_data.iloc[-1].get('MACD_Hist', None)
+                    if pd.notna(macd_hist) and macd_hist <= 0:
+                        final_signal = 'SELL'
+
+                # ADX buy filter
+                if params.get('use_adx', False) and final_signal == 'BUY':
+                    adx = qqq_data.iloc[-1].get('ADX', None)
+                    plus_di = qqq_data.iloc[-1].get('+DI', None)
+                    minus_di = qqq_data.iloc[-1].get('-DI', None)
+                    if pd.notna(adx) and pd.notna(plus_di) and pd.notna(minus_di):
+                        if adx < params['adx_threshold'] or plus_di < minus_di:
+                            final_signal = 'SELL'
+            
+            # Standalone SELL conditions
             if params['use_bb']:
                 latest_bb_position = qqq_data.iloc[-1]['BB_Position']
-                if pd.notna(latest_bb_position):
-                    if final_signal == 'BUY' and latest_bb_position > params['bb_buy_threshold']:
-                        final_signal = 'SELL'
-                    elif latest_bb_position >= params['bb_sell_threshold']:
-                        final_signal = 'SELL'
+                if pd.notna(latest_bb_position) and latest_bb_position >= params['bb_sell_threshold']:
+                    final_signal = 'SELL'
             
             st.markdown(f"### 📅 Signal for {latest_date.strftime('%Y-%m-%d')}")
             
@@ -483,7 +533,11 @@ def _run_custom_simulation(params, test_params):
             params['use_atr'], params['atr_period'], params['atr_multiplier'],
             params['use_msl_msh'], params['msl_period'], params['msh_period'],
             params['msl_lookback'], params['msh_lookback'],
-            params['use_ema']
+            params['use_ema'],
+            params.get('use_macd', False), params.get('macd_fast', 12),
+            params.get('macd_slow', 26), params.get('macd_signal_period', 9),
+            params.get('use_adx', False), params.get('adx_period', 14),
+            params.get('adx_threshold', 25)
         )
         
         # Calculate QQQ benchmark
@@ -609,7 +663,11 @@ def _run_monte_carlo(params, test_params):
             params['use_atr'], params['atr_period'], params['atr_multiplier'],
             params['use_msl_msh'], params['msl_period'], params['msh_period'],
             params['msl_lookback'], params['msh_lookback'],
-            params['use_ema']
+            params['use_ema'],
+            params.get('use_macd', False), params.get('macd_fast', 12),
+            params.get('macd_slow', 26), params.get('macd_signal_period', 9),
+            params.get('use_adx', False), params.get('adx_period', 14),
+            params.get('adx_threshold', 25)
         )
         
         portfolio_df = result['portfolio_df'].copy()

@@ -25,8 +25,8 @@ import requests
 
 # Alpaca credentials: prefer environment variables for safety.
 # If env vars are not set, the defaults below (placeholders) are used.
-ALPACA_API_KEY = os.getenv('ALPACA_API_KEY', "PKKPLP36QVRYGIXPWJ4H6I2BG2")
-ALPACA_API_SECRET = os.getenv('ALPACA_API_SECRET', "CVskWgEoGjbi17M1GYs9FYB3EWwipGZNBBzeaVHmGJQX")
+ALPACA_API_KEY = os.getenv('ALPACA_API_KEY', "")
+ALPACA_API_SECRET = os.getenv('ALPACA_API_SECRET', "")
 # By default the script was using the paper endpoint. To submit real/live
 # orders set ALPACA_BASE_URL to 'https://api.alpaca.markets' via env var.
 ALPACA_BASE_URL = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
@@ -274,7 +274,7 @@ def compute_trailing_stop(peak_price: Optional[float], current_price: float, pct
     return new_peak, stop_price
 
 
-def run_once(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, live: bool = False, dry_run: bool = True):
+def run_once(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, live: bool = False, dry_run: bool = True, interval: int = 60):
     # Fetch history for indicators (QQQ) and use Alpaca/yfinance for current prices
     # Fetch raw history (keep a clean copy without EMA columns)
     hist = fetch_history(SYMBOL_QQQ, days=HISTORY_DAYS_QQQ)
@@ -382,11 +382,8 @@ def run_once(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, live
     except Exception:
         preview_stop = float('nan')
 
-    # Format the SL preview as a human-friendly string (N/A when not available)
-    if isinstance(preview_stop, float) and math.isfinite(preview_stop):
-        sl_display = f"{preview_stop:.2f}"
-    else:
-        sl_display = 'N/A'
+    # Calculate current drawdown (0% for preview since no position)
+    current_drawdown = "0.00%"
 
     # Extract EMA scalars robustly (handle MultiIndex or unexpected column shapes)
     try:
@@ -404,11 +401,19 @@ def run_once(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, live
         except Exception:
             es = float('nan')
 
-    # Reformat Analysis log as requested: compact, CSV-like with parentheses
+    # Calculate signal deviation
+    if signal == 'BUY':
+        deviation = (qqq_close - ef) / ef * 100 if ef > 0 else 0
+    else:
+        deviation = (es - qqq_close) / es * 100 if es > 0 else 0
+    dev_display = f"{deviation:+.2f}%"
+
+    # Human-readable logs in sections
+    logger.info('=== Settings Used ===\nEMA Fast: %d, EMA Slow: %d, Stop Loss: %.2f%%, Mode: %s, Loop: enabled, Interval: %d', fast_span, slow_span, stop_pct, 'live' if live else 'paper', interval)
+
     ef_str = (f"{ef:.2f}" if not math.isnan(ef) else 'nan')
     es_str = (f"{es:.2f}" if not math.isnan(es) else 'nan')
-    # Log only EMA values and signal; omit raw QQQ price as requested
-    logger.info('qqq_ema_fast=%s, qqq_ema_slow=%s, sl_preview=%s, signal=%s', ef_str, es_str, sl_display, signal)
+    logger.info('=== Values Calculated ===\nEMA Fast: %s, EMA Slow: %s, EMA Signal Deviation: %s, Drawdown: %s, Signal: %s', ef_str, es_str, dev_display, current_drawdown, signal)
 
     # (compact logging) the most-recent values are included in the Analysis line above
 
@@ -447,29 +452,26 @@ def run_once(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, live
         if ref_price is not None and ref_price > 0:
             drawdown_pct = (ref_price - tqqq_price) / ref_price * 100.0
 
-        # Compute distance to stop in dollars and percent (percent of peak when available)
+        # Compute distance to stop in dollars (percent removed as redundant)
         dist_dollars: Optional[float] = None
-        pct_to_stop: Optional[float] = None
         if cur_stop is not None:
             dist_dollars = tqqq_price - cur_stop
-            if cur_peak is not None and cur_peak > 0:
-                pct_to_stop = dist_dollars / cur_peak * 100.0
-            else:
-                pct_to_stop = (dist_dollars / tqqq_price) * 100.0 if tqqq_price > 0 else None
 
         sl_str = f"${cur_stop:.2f}" if cur_stop is not None else 'N/A'
         draw_str = f"{drawdown_pct:.2f}%" if drawdown_pct is not None else 'N/A'
         dist_str = f"${dist_dollars:.2f}" if dist_dollars is not None else 'N/A'
-        pct_str = f"{pct_to_stop:.2f}%" if pct_to_stop is not None else 'N/A'
 
-        logger.info('position_shares=%.2f, peak=%s, tqqq_price=%.2f, stop=%s, dist_to_stop=%s, pct_to_stop=%s, drawdown=%s, sl_cfg_pct=%.2f', position_shares, f"{cur_peak:.2f}" if cur_peak is not None else 'N/A', tqqq_price, sl_str, dist_str, pct_str, draw_str, stop_pct)
+        # Position info now included in Account Info section below
 
     # If running live, attempt to read account cash and override provided capital
     capital_local = capital
     if live:
         try:
             capital_local = float(get_alpaca_account_cash())
-            logger.info('alpaca_cash=%.2f', capital_local)
+            account_info = f'Cash: ${capital_local:.2f}'
+            if position_shares > 0:
+                account_info += f' | Position: {position_shares:.2f} shares @ ${entry_price:.2f}, Peak: ${cur_peak:.2f}, Current: ${tqqq_price:.2f}, Stop: ${cur_stop:.2f}, Drawdown: {drawdown_pct:.2f}%'
+            logger.info('=== Account Info ===\n%s', account_info)
         except Exception as e:
             logger.warning('Could not read Alpaca account cash, using provided capital %.2f: %s', capital_local, e)
 
@@ -478,61 +480,42 @@ def run_once(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, live
         qty = round(capital_local / tqqq_price)
         budget = qty * tqqq_price
         if qty > 0:
-            logger.info('order_action=BUY, order_qty=%.0f, order_symbol=%s, order_price=%.2f, order_budget=%.2f', qty, SYMBOL_TQQQ, tqqq_price, budget)
+            logger.info('=== Order Action ===\nAction: BUY, Qty: %.0f, Symbol: %s, Price: %.2f, Budget: %.2f', qty, SYMBOL_TQQQ, tqqq_price, budget)
             if live and not dry_run:
                 order = submit_order_alpaca(SYMBOL_TQQQ, qty, side='buy')
-                logger.info('order_submitted=true, order_side=BUY, order_id=%s', order.get('id'))
+                logger.info('Order Submitted: BUY, ID: %s', order.get('id'))
             else:
-                logger.info('dry_run=true, order_side=BUY, submitted=false')
+                logger.info('Dry Run: BUY not submitted')
         else:
-            logger.info('insufficient_cash, signal=BUY, cash=%.2f', capital_local)
+            logger.info('=== Order Action ===\nInsufficient cash for BUY')
     elif signal == 'SELL' and position_shares >= 0.5:
         qty = round(position_shares)
         if qty > 0:
-            logger.info('order_action=SELL, order_qty=%.0f, order_symbol=%s, order_price=%.2f', qty, SYMBOL_TQQQ, tqqq_price)
+            logger.info('=== Order Action ===\nAction: SELL, Qty: %.0f, Symbol: %s, Price: %.2f', qty, SYMBOL_TQQQ, tqqq_price)
             if live and not dry_run:
                 order = submit_order_alpaca(SYMBOL_TQQQ, qty, side='sell')
-                logger.info('order_submitted=true, order_side=SELL, order_id=%s', order.get('id'))
+                logger.info('Order Submitted: SELL, ID: %s', order.get('id'))
             else:
-                logger.info('dry_run=true, order_side=SELL, submitted=false')
+                logger.info('Dry Run: SELL not submitted')
         else:
-            logger.info('insufficient_shares_to_sell, signal=SELL, shares=%.2f', position_shares)
+            logger.info('=== Order Action ===\nInsufficient shares to sell')
     elif signal == 'SELL' and 0 < position_shares < 0.5:
-        logger.info('insufficient_shares_to_sell, signal=SELL, shares=%.2f', position_shares)
+        logger.info('=== Order Action ===\nInsufficient shares to sell')
     else:
-        logger.info('signal=%s, position=%s', signal, 'long' if position_shares > 0 else 'flat')
+        logger.info('=== Order Action ===\nNo action: Signal=%s, Position=%s', signal, 'long' if position_shares > 0 else 'flat')
 
     # Compute trailing stop preview (even if not selling)
     if position_shares > 0:
         peak_price, stop_price = compute_trailing_stop(peak_price, tqqq_price, stop_pct)
-        # Removed verbose trailing stop line per request; keep only trigger event.
-        # logger.info('trailing_peak=%.2f, trailing_stop_pct=%.2f, trailing_stop_price=%.2f', peak_price, stop_pct, stop_price)
-        if tqqq_price <= stop_price:
-            logger.info('stop_triggered=true, price_current=%.2f, price_stop=%.2f', tqqq_price, stop_price)
-    else:
-        logger.info('position=None, trailing_stop=None')
+        # Trailing stop info now in Account Info
 
-    # Single-line OP summary (brief, human readable) logged every loop
-    try:
-        pos_side = 'long' if position_shares > 0 else 'flat'
-        entry_txt = f"@{entry_price:.2f}" if position_shares > 0 and entry_price > 0 else ''
-        stop_txt = f"Stop={sl_str}" if position_shares > 0 else 'Stop=N/A'
-        dist_txt = f"{pct_str}/{dist_str}" if position_shares > 0 else ''
-        op_line = (
-            f"OP Sig={signal}, EMA{fast_span}={ef_str}, EMA{slow_span}={es_str}, "
-            f"TQQQ={tqqq_price:.2f}, Pos={pos_side}:{position_shares:.2f}{('/'+entry_txt) if entry_txt else ''}, "
-            f"{stop_txt}{(', Dist='+dist_txt) if dist_txt else ''}, Cash=${capital_local:.2f}, SLprev=${sl_display}"
-        )
-        logger.info(op_line)
-    except Exception:
-        pass
+    # Single-line OP summary removed for cleaner logs
 
 
 def run_loop(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, interval: int, live: bool = False, dry_run: bool = True):
-    logger.info('loop_ema_fast=%d, loop_ema_slow=%d, loop_sl_pct=%.2f, loop_interval=%d', ema_fast, ema_slow, stop_pct, interval)
     while True:
         try:
-            run_once(ema_fast, ema_slow, stop_pct, capital, live=live, dry_run=dry_run)
+            run_once(ema_fast, ema_slow, stop_pct, capital, live=live, dry_run=dry_run, interval=interval)
         except Exception as e:
             logger.exception('Error during iteration: %s', e)
         logger.info('sleep_seconds=%d', interval)
@@ -541,7 +524,6 @@ def run_loop(ema_fast: int, ema_slow: int, stop_pct: float, capital: float, inte
 
 def main():
     # Simplified runner: no command-line options. Always run live and loop.
-    logger.info('mode_live=True, mode_loop=True')
     run_loop(EMA_FAST, EMA_SLOW, STOP_LOSS_PCT, INITIAL_CAPITAL, DEFAULT_LOOP_INTERVAL, live=True, dry_run=False)
 
 

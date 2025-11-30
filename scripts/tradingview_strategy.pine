@@ -1,0 +1,41 @@
+//@version=5
+strategy("QQQ EMA Crossover TQQQ Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Inputs
+fastLength = input.int(9, "Fast EMA Length", minval=1)
+slowLength = input.int(25, "Slow EMA Length", minval=1)
+stopLossPct = input.float(15.0, "Trailing Stop Loss %", minval=0.0, step=0.1)
+
+// Calculate EMAs on QQQ (assuming this script is on QQQ chart)
+fastEMA = ta.ema(close, fastLength)
+slowEMA = ta.ema(close, slowLength)
+
+// Plot EMAs
+plot(fastEMA, color=color.blue, title="Fast EMA")
+plot(slowEMA, color=color.red, title="Slow EMA")
+
+// Display QQQ current price as a label
+if barstate.islast
+    label.new(bar_index, high, text="QQQ: " + str.tostring(close), style=label.style_label_down, color=color.white, textcolor=color.black)
+
+// Trailing Stop Logic
+var float peakEquity = na
+peakEquity := math.max(peakEquity, strategy.equity)
+trailingStop = peakEquity * (1 - stopLossPct / 100)
+
+// Buy Signal: Fast EMA > Slow EMA and not in position
+buySignal = ta.crossover(fastEMA, slowEMA) and strategy.position_size == 0
+
+// Sell Signal: Fast EMA < Slow EMA or Trailing Stop hit
+sellSignal = ta.crossunder(fastEMA, slowEMA) or strategy.equity < trailingStop
+
+// Execute Trades
+if buySignal
+    strategy.entry("Buy TQQQ", strategy.long)
+
+if sellSignal
+    strategy.close("Buy TQQQ")
+
+// Reset peak on sell
+if sellSignal
+    peakEquity := strategy.equity

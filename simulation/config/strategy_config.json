@@ -1,0 +1,43 @@
+{
+    "use_ema": true,
+    "use_double_ema": true,
+    "ema_period": 50,
+    "ema_fast": 2,
+    "ema_slow": 21,
+
+    "use_rsi": false,
+    "rsi_threshold": 0,
+    "rsi_oversold": 30,
+    "rsi_overbought": 70,
+    
+    "use_bb": false,
+    "bb_period": 20,
+    "bb_std_dev": 2,
+    "bb_buy_threshold": 0.2,
+    "bb_sell_threshold": 0.8,
+    
+    "use_atr": false,
+    "atr_period": 14,
+    "atr_multiplier": 2,
+    
+    "use_msl_msh": false,
+    "msl_period": 20,
+    "msl_lookback": 5,
+    
+    "use_macd": false,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal_period": 9,
+    
+    "use_adx": false,
+    "adx_period": 14,
+    "adx_threshold": 25,
+    
+    "use_supertrend": false,
+    "st_period": 10,
+    "st_multiplier": 3,
+    
+    "use_stop_loss": true,
+    "stop_loss_type": "percentage",
+    "stop_loss_pct": 15
+}

@@ -5,6 +5,7 @@ from .indicators import (
     calculate_bollinger_bands, calculate_atr, calculate_msl_msh,
     calculate_macd, calculate_adx, calculate_supertrend
 )
+from .stoploss import compute_stop_state
 
 
 def run_tqqq_only_strategy(
@@ -143,14 +144,31 @@ def run_tqqq_only_strategy(
                 stop_loss_triggered = True
                 stop_loss_reason = f'Stop-Loss ({drawdown_from_peak:.2f}% from peak)'
         
-        # ATR-based stop loss
+        # ATR-based stop loss (delegate numeric calculation to shared helper)
         if use_atr and position == 'TQQQ' and date in tqqq_data.index:
-            tqqq_atr = tqqq_data.loc[date].get('ATR', None)
-            if pd.notna(tqqq_atr) and shares > 0:
-                atr_stop_price = tqqq_close - (atr_multiplier * tqqq_atr)
-                if tqqq_close <= atr_stop_price:
+            try:
+                tqqq_row = tqqq_data.loc[date]
+                # Build a minimal params dict to pass to the helper
+                sl_params = {
+                    'use_stop_loss': False,
+                    'stop_loss_pct': stop_loss_pct,
+                    'use_atr': True,
+                    'atr_multiplier': atr_multiplier,
+                    'use_msl_msh': use_msl_msh
+                }
+                stop_state = compute_stop_state(sl_params, sim_data.iloc[i], tqqq_close, None, tqqq_close, tqqq_row=tqqq_row)
+                if stop_state.get('triggered'):
                     stop_loss_triggered = True
-                    stop_loss_reason = f'ATR Stop-Loss (Price: ${tqqq_close:.2f} <= Stop: ${atr_stop_price:.2f})'
+                    sp = stop_state.get('stop_price')
+                    stop_loss_reason = f'ATR Stop-Loss (Price: ${tqqq_close:.2f} <= Stop: ${sp:.2f})' if sp is not None else 'ATR Stop-Loss triggered'
+            except Exception:
+                # Fall back to original behavior if helper call fails
+                tqqq_atr = tqqq_data.loc[date].get('ATR', None)
+                if pd.notna(tqqq_atr) and shares > 0:
+                    atr_stop_price = tqqq_close - (atr_multiplier * tqqq_atr)
+                    if tqqq_close <= atr_stop_price:
+                        stop_loss_triggered = True
+                        stop_loss_reason = f'ATR Stop-Loss (Price: ${tqqq_close:.2f} <= Stop: ${atr_stop_price:.2f})'
         
         # MSL/MSH-based stop loss
         if use_msl_msh and position == 'TQQQ' and date in tqqq_data.index:

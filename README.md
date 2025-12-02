@@ -107,11 +107,11 @@ A simplified trader with double-EMA and trailing stop:
 python scripts/alpaca_trader_minimal.py
 ```
 
-Environment variables can be used instead of the secrets file:
-- `ALPACA_API_KEY`
-- `ALPACA_API_SECRET`
-- `ALPACA_BASE_URL`
-- `ALPACA_DATA_URL`
+Environment variables can also be used (as used in the minimal trader):
+- `ALPACA_API_KEY` - Alpaca API key ID
+- `ALPACA_API_SECRET` - Alpaca secret key
+- `ALPACA_BASE_URL` - Alpaca API base URL
+- `ALPACA_DATA_URL` - Alpaca data API URL
 
 ## Strategy Configuration
 
@@ -124,14 +124,41 @@ The trading strategy can be configured via `simulation/config/strategy_config.js
     "ema_period": 50,
     "ema_fast": 2,
     "ema_slow": 21,
+
     "use_rsi": false,
+    "rsi_threshold": 0,
+    "rsi_oversold": 30,
+    "rsi_overbought": 70,
+    
     "use_bb": false,
+    "bb_period": 20,
+    "bb_std_dev": 2,
+    "bb_buy_threshold": 0.2,
+    "bb_sell_threshold": 0.8,
+    
     "use_atr": false,
+    "atr_period": 14,
+    "atr_multiplier": 2,
+    
     "use_msl_msh": false,
+    "msl_period": 20,
+    "msl_lookback": 5,
+    
     "use_macd": false,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal_period": 9,
+    
     "use_adx": false,
+    "adx_period": 14,
+    "adx_threshold": 25,
+    
     "use_supertrend": false,
+    "st_period": 10,
+    "st_multiplier": 3,
+    
     "use_stop_loss": true,
+    "stop_loss_type": "percentage",
     "stop_loss_pct": 15
 }
 ```
@@ -141,11 +168,28 @@ The trading strategy can be configured via `simulation/config/strategy_config.js
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `use_ema` | Enable EMA-based signals | `true` |
-| `use_double_ema` | Use double EMA crossover | `true` |
-| `ema_fast` | Fast EMA period | `2` |
-| `ema_slow` | Slow EMA period | `21` |
-| `use_stop_loss` | Enable trailing stop-loss | `true` |
-| `stop_loss_pct` | Stop-loss percentage | `15` |
+| `use_double_ema` | Use double EMA crossover instead of single EMA | `true` |
+| `ema_period` | Period for single EMA strategy | `50` |
+| `ema_fast` | Fast EMA period (for double EMA) | `2` |
+| `ema_slow` | Slow EMA period (for double EMA) | `21` |
+| `use_rsi` | Enable RSI filter | `false` |
+| `rsi_threshold` | RSI momentum threshold | `0` |
+| `rsi_oversold` | RSI oversold level | `30` |
+| `rsi_overbought` | RSI overbought level | `70` |
+| `use_bb` | Enable Bollinger Bands filter | `false` |
+| `bb_period` | Bollinger Bands period | `20` |
+| `bb_std_dev` | Bollinger Bands standard deviation | `2` |
+| `use_atr` | Enable ATR-based stop-loss | `false` |
+| `atr_period` | ATR calculation period | `14` |
+| `atr_multiplier` | ATR multiplier for stop distance | `2` |
+| `use_macd` | Enable MACD filter | `false` |
+| `use_adx` | Enable ADX filter | `false` |
+| `adx_threshold` | ADX trend strength threshold | `25` |
+| `use_supertrend` | Enable Supertrend filter | `false` |
+| `st_period` | Supertrend period | `10` |
+| `st_multiplier` | Supertrend multiplier | `3` |
+| `use_stop_loss` | Enable percentage-based trailing stop-loss | `true` |
+| `stop_loss_pct` | Stop-loss percentage from peak | `15` |
 
 ## Project Structure
 
@@ -174,6 +218,8 @@ TradingSimulations/
 ├── scripts/                # Trading scripts
 │   ├── alpaca_trader.py          # Full Alpaca trading bot
 │   ├── alpaca_trader_minimal.py  # Minimal trading bot
+│   ├── inspect_append_debug.py   # Debug utility for data inspection
+│   ├── inspect_ema.py            # EMA inspection utility
 │   └── tradingview_strategy.pine # TradingView Pine Script
 ├── utils/                  # Shared utilities
 │   └── logging.py          # Logging configuration

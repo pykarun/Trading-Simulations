@@ -317,3 +317,57 @@ def calculate_supertrend(data, period=10, multiplier=3.0):
     df['ST_dir'] = dir_series
 
     return df
+
+
+def calculate_pivot_points(data, pivot_left=5, pivot_right=5):
+    """Calculate pivot point highs and lows.
+    
+    A pivot high is a local maximum where the high is greater than 
+    pivot_left bars to the left and pivot_right bars to the right.
+    
+    A pivot low is a local minimum where the low is less than
+    pivot_left bars to the left and pivot_right bars to the right.
+    
+    Args:
+        data: DataFrame with 'High' and 'Low' columns
+        pivot_left: Number of bars to the left for comparison
+        pivot_right: Number of bars to the right for comparison
+        
+    Returns:
+        DataFrame with added columns: 'Pivot_High', 'Pivot_Low'
+    """
+    df = data.copy()
+    
+    # Ensure required columns exist
+    for col in ['High', 'Low']:
+        if col not in df.columns:
+            raise ValueError(f"DataFrame must contain '{col}' column to calculate pivot points")
+    
+    # Initialize pivot columns with NaN
+    df['Pivot_High'] = pd.Series(dtype='float64')
+    df['Pivot_Low'] = pd.Series(dtype='float64')
+    
+    # Calculate pivots (need at least pivot_left + pivot_right + 1 bars)
+    min_bars = pivot_left + pivot_right + 1
+    
+    if len(df) < min_bars:
+        return df
+    
+    for i in range(pivot_left, len(df) - pivot_right):
+        # Check for pivot high
+        current_high = df['High'].iloc[i]
+        left_highs = df['High'].iloc[i - pivot_left:i]
+        right_highs = df['High'].iloc[i + 1:i + pivot_right + 1]
+        
+        if (current_high > left_highs.max()) and (current_high > right_highs.max()):
+            df.loc[df.index[i], 'Pivot_High'] = current_high
+        
+        # Check for pivot low
+        current_low = df['Low'].iloc[i]
+        left_lows = df['Low'].iloc[i - pivot_left:i]
+        right_lows = df['Low'].iloc[i + 1:i + pivot_right + 1]
+        
+        if (current_low < left_lows.min()) and (current_low < right_lows.min()):
+            df.loc[df.index[i], 'Pivot_Low'] = current_low
+    
+    return df

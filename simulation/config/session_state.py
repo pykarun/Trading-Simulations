@@ -42,6 +42,19 @@ def initialize_session_state():
         'manual_use_msl_msh': False,
         'manual_msl_period': 20,
         'manual_msl_lookback': 5,
+        'manual_use_macd': False,
+        'manual_macd_fast': 12,
+        'manual_macd_slow': 26,
+        'manual_macd_signal_period': 9,
+        'manual_use_adx': False,
+        'manual_adx_period': 14,
+        'manual_adx_threshold': 25,
+        'manual_use_supertrend': False,
+        'manual_st_period': 10,
+        'manual_st_multiplier': 3.0,
+        'manual_use_pivot': False,
+        'manual_pivot_left': 5,
+        'manual_pivot_right': 5,
     }
     
     for key, default_value in manual_params.items():
@@ -74,6 +87,19 @@ def initialize_session_state():
         'msh_period': 20,
         'msl_lookback': 5,
         'msh_lookback': 5,
+        'use_macd': False,
+        'macd_fast': 12,
+        'macd_slow': 26,
+        'macd_signal_period': 9,
+        'use_adx': False,
+        'adx_period': 14,
+        'adx_threshold': 25,
+        'use_supertrend': False,
+        'st_period': 10,
+        'st_multiplier': 3.0,
+        'use_pivot': False,
+        'pivot_left': 5,
+        'pivot_right': 5,
     }
     
     for key, default_value in testing_params.items():

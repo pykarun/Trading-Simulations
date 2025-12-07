@@ -18,7 +18,8 @@ def run_tqqq_only_strategy(
     msl_lookback=5, msh_lookback=5, use_ema=True, use_macd=False,
     macd_fast=12, macd_slow=26, macd_signal_period=9, use_adx=False,
     adx_period=14, adx_threshold=25,
-    use_supertrend=False, st_period=10, st_multiplier=3.0
+    use_supertrend=False, st_period=10, st_multiplier=3.0,
+    use_pivot=False, pivot_left=5, pivot_right=5
 ):
     """Smart Leverage Strategy - TQQQ with EMA, RSI, Bollinger Bands & Stop-Loss.
     
@@ -92,6 +93,11 @@ def run_tqqq_only_strategy(
         except Exception:
             # If Supertrend calculation fails, ensure the rest still runs
             pass
+    
+    if use_pivot:
+        from .indicators import calculate_pivot_points
+        qqq_data = calculate_pivot_points(qqq_data, pivot_left, pivot_right)
+        tqqq_data = calculate_pivot_points(tqqq_data, pivot_left, pivot_right)
     
     sim_data = qqq_data[start_date:end_date].copy()
     
@@ -283,6 +289,65 @@ def run_tqqq_only_strategy(
             signal_text = 'EMA Disabled'
             ema_display = 'N/A'
         
+        # Get pivot point values if enabled
+        pivot_high_val = 'N/A'
+        pivot_low_val = 'N/A'
+        pivot_status = 'None'
+        nearest_pivot_high = 'N/A'
+        nearest_pivot_low = 'N/A'
+        
+        if use_pivot:
+            # Check if currently at a pivot point
+            if 'Pivot_High' in sim_data.columns and pd.notna(sim_data.iloc[i]['Pivot_High']):
+                pivot_high_val = f'${sim_data.iloc[i]["Pivot_High"]:.2f}'
+                pivot_status = '🔴 AT PIVOT HIGH (Resistance)'
+            if 'Pivot_Low' in sim_data.columns and pd.notna(sim_data.iloc[i]['Pivot_Low']):
+                pivot_low_val = f'${sim_data.iloc[i]["Pivot_Low"]:.2f}'
+                pivot_status = '🟢 AT PIVOT LOW (Support)'
+            
+            # Find nearest previous pivot high and low for reference
+            if 'Pivot_High' in sim_data.columns:
+                prev_pivot_highs = sim_data.iloc[:i+1]['Pivot_High'].dropna()
+                if len(prev_pivot_highs) > 0:
+                    nearest_pivot_high = f'${prev_pivot_highs.iloc[-1]:.2f}'
+            
+            if 'Pivot_Low' in sim_data.columns:
+                prev_pivot_lows = sim_data.iloc[:i+1]['Pivot_Low'].dropna()
+                if len(prev_pivot_lows) > 0:
+                    nearest_pivot_low = f'${prev_pivot_lows.iloc[-1]:.2f}'
+        
+        # Get supertrend value if enabled
+        supertrend_val = 'N/A'
+        supertrend_dir = 'N/A'
+        if use_supertrend and 'ST' in sim_data.columns:
+            if pd.notna(sim_data.iloc[i]['ST']):
+                supertrend_val = f'${sim_data.iloc[i]["ST"]:.2f}'
+            if 'ST_dir' in sim_data.columns and pd.notna(sim_data.iloc[i]['ST_dir']):
+                supertrend_dir = '🔼 Uptrend' if sim_data.iloc[i]['ST_dir'] == 1 else '🔽 Downtrend'
+        
+        # Build threshold info for trade log
+        threshold_info = []
+        if use_rsi and rsi_threshold > 0:
+            threshold_info.append(f'RSI>{rsi_threshold}')
+        if use_stop_loss and stop_loss_pct > 0:
+            threshold_info.append(f'SL:{stop_loss_pct}%')
+        if use_bb:
+            threshold_info.append(f'BB({bb_period},{bb_std_dev},Buy:{bb_buy_threshold}/Sell:{bb_sell_threshold})')
+        if use_atr:
+            threshold_info.append(f'ATR({atr_period},{atr_multiplier}x)')
+        if use_msl_msh:
+            threshold_info.append(f'MSL({msl_period},{msl_lookback})')
+        if use_macd:
+            threshold_info.append(f'MACD({macd_fast}/{macd_slow}/{macd_signal_period})')
+        if use_adx:
+            threshold_info.append(f'ADX>{adx_threshold}')
+        if use_supertrend:
+            threshold_info.append(f'ST({st_period},{st_multiplier})')
+        if use_pivot:
+            threshold_info.append(f'Pivot(L:{pivot_left}/R:{pivot_right})')
+        
+        thresholds_str = ' | '.join(threshold_info) if threshold_info else 'None'
+        
         trade_log.append({
             'Date': date.strftime('%Y-%m-%d'),
             'Action': action,
@@ -291,12 +356,20 @@ def run_tqqq_only_strategy(
             'RSI': f'{rsi:.1f}' if pd.notna(rsi) else 'N/A',
             'MACD_Hist': f'{sim_data.iloc[i].get("MACD_Hist", 0):.2f}' if use_macd else 'N/A',
             'ADX': f'{sim_data.iloc[i].get("ADX", 0):.1f}' if use_adx else 'N/A',
+            'Supertrend': supertrend_val,
+            'ST_Direction': supertrend_dir,
+            'Pivot_High_Current': pivot_high_val,
+            'Pivot_Low_Current': pivot_low_val,
+            'Nearest_Pivot_High': nearest_pivot_high,
+            'Nearest_Pivot_Low': nearest_pivot_low,
+            'Pivot_Status': pivot_status,
             'Signal': signal_text,
             'TQQQ_Price': f'${tqqq_close:.2f}',
             'Shares': f'{shares:.2f}',
             'Portfolio_Value': f'${current_value:,.2f}',
             'Position': position if position else 'Cash',
-            'Stop_Loss': stop_loss_reason if stop_loss_triggered else ''
+            'Stop_Loss': stop_loss_reason if stop_loss_triggered else '',
+            'Thresholds': thresholds_str
         })
         
         portfolio_value.append({'Date': date, 'Value': current_value})

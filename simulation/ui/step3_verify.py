@@ -105,6 +105,12 @@ def _load_params_to_manual_config():
     st.session_state.manual_use_adx = best_params.get('use_adx', False)
     st.session_state.manual_adx_period = best_params.get('adx_period', 14)
     st.session_state.manual_adx_threshold = best_params.get('adx_threshold', 25)
+    st.session_state.manual_use_supertrend = best_params.get('use_supertrend', False)
+    st.session_state.manual_st_period = best_params.get('st_period', 10)
+    st.session_state.manual_st_multiplier = best_params.get('st_multiplier', 3.0)
+    st.session_state.manual_use_pivot = best_params.get('use_pivot', False)
+    st.session_state.manual_pivot_left = best_params.get('pivot_left', 5)
+    st.session_state.manual_pivot_right = best_params.get('pivot_right', 5)
 
 
 def _get_manual_defaults():
@@ -137,7 +143,13 @@ def _get_manual_defaults():
         'macd_signal_period': st.session_state.manual_macd_signal_period,
         'use_adx': st.session_state.manual_use_adx,
         'adx_period': st.session_state.manual_adx_period,
-        'adx_threshold': st.session_state.manual_adx_threshold
+        'adx_threshold': st.session_state.manual_adx_threshold,
+        'use_supertrend': st.session_state.get('manual_use_supertrend', False),
+        'st_period': st.session_state.get('manual_st_period', 10),
+        'st_multiplier': st.session_state.get('manual_st_multiplier', 3.0),
+        'use_pivot': st.session_state.get('manual_use_pivot', False),
+        'pivot_left': st.session_state.get('manual_pivot_left', 5),
+        'pivot_right': st.session_state.get('manual_pivot_right', 5)
     }
 
 
@@ -289,6 +301,34 @@ def _render_manual_configuration(defaults):
     else:
         manual_adx_period = 14
         manual_adx_threshold = 25
+
+    # Supertrend Filter
+    st.markdown("**Condition 9: Supertrend Filter (Optional)**")
+    manual_use_supertrend = st.checkbox("Enable Supertrend Filter", value=defaults.get('use_supertrend', False))
+
+    if manual_use_supertrend:
+        col1, col2 = st.columns(2)
+        with col1:
+            manual_st_period = st.slider("Supertrend Period", min_value=5, max_value=30, value=defaults.get('st_period', 10), step=1)
+        with col2:
+            manual_st_multiplier = st.slider("Supertrend Multiplier", min_value=1.0, max_value=5.0, value=defaults.get('st_multiplier', 3.0), step=0.5)
+    else:
+        manual_st_period = 10
+        manual_st_multiplier = 3.0
+
+    # Pivot Points
+    st.markdown("**Condition 10: Pivot Points (Optional)**")
+    manual_use_pivot = st.checkbox("Enable Pivot Points", value=defaults.get('use_pivot', False))
+
+    if manual_use_pivot:
+        col1, col2 = st.columns(2)
+        with col1:
+            manual_pivot_left = st.slider("Pivot Left Lookback", min_value=3, max_value=20, value=defaults.get('pivot_left', 5), step=1)
+        with col2:
+            manual_pivot_right = st.slider("Pivot Right Lookback", min_value=3, max_value=20, value=defaults.get('pivot_right', 5), step=1)
+    else:
+        manual_pivot_left = 5
+        manual_pivot_right = 5
     
     return {
         'use_double_ema': manual_use_double_ema,
@@ -318,7 +358,13 @@ def _render_manual_configuration(defaults):
         'macd_signal_period': manual_macd_signal_period,
         'use_adx': manual_use_adx,
         'adx_period': manual_adx_period,
-        'adx_threshold': manual_adx_threshold
+        'adx_threshold': manual_adx_threshold,
+        'use_supertrend': manual_use_supertrend,
+        'st_period': manual_st_period,
+        'st_multiplier': manual_st_multiplier,
+        'use_pivot': manual_use_pivot,
+        'pivot_left': manual_pivot_left,
+        'pivot_right': manual_pivot_right
     }
 
 
@@ -349,6 +395,12 @@ def _render_signal_summary(params):
     if params.get('use_adx', False):
         buy_conditions.append(f"**ADX > {params['adx_threshold']} AND +DI > -DI (strong uptrend)**")
     
+    if params.get('use_supertrend', False):
+        buy_conditions.append(f"**Price above Supertrend (Period: {params['st_period']}, Multiplier: {params['st_multiplier']})**")
+    
+    if params.get('use_pivot', False):
+        buy_conditions.append(f"**Price near Pivot Low support (Left: {params['pivot_left']}, Right: {params['pivot_right']})**")
+    
     # Build SELL conditions
     sell_conditions = []
     if params['use_double_ema']:
@@ -376,6 +428,12 @@ def _render_signal_summary(params):
 
     if params.get('use_adx', False):
         sell_conditions.append(f"**ADX < {params['adx_threshold']} OR +DI < -DI (weak or downtrend)**")
+    
+    if params.get('use_supertrend', False):
+        sell_conditions.append(f"**Price below Supertrend (Period: {params['st_period']}, Multiplier: {params['st_multiplier']})**")
+    
+    if params.get('use_pivot', False):
+        sell_conditions.append(f"**Price near Pivot High resistance (Left: {params['pivot_left']}, Right: {params['pivot_right']})**")
     
     col1, col2 = st.columns(2)
     
@@ -428,7 +486,13 @@ def _apply_manual_configuration(params):
         'macd_signal_period': params.get('macd_signal_period', 9),
         'use_adx': params.get('use_adx', False),
         'adx_period': params.get('adx_period', 14),
-        'adx_threshold': params.get('adx_threshold', 25)
+        'adx_threshold': params.get('adx_threshold', 25),
+        'use_supertrend': params.get('use_supertrend', False),
+        'st_period': params.get('st_period', 10),
+        'st_multiplier': params.get('st_multiplier', 3.0),
+        'use_pivot': params.get('use_pivot', False),
+        'pivot_left': params.get('pivot_left', 5),
+        'pivot_right': params.get('pivot_right', 5)
     }
     
     st.session_state.best_params = params_to_apply

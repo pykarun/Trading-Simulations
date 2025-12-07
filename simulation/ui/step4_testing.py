@@ -229,6 +229,16 @@ def _display_current_configuration(params):
     else:
         strategy_summary.append("**ADX:** Disabled")
     
+    if params.get('use_supertrend', False):
+        strategy_summary.append(f"**Supertrend:** Enabled ({params['st_period']},{params['st_multiplier']})")
+    else:
+        strategy_summary.append("**Supertrend:** Disabled")
+    
+    if params.get('use_pivot', False):
+        strategy_summary.append(f"**Pivot:** Enabled ({params['pivot_left']}/{params['pivot_right']})")
+    else:
+        strategy_summary.append("**Pivot:** Disabled")
+    
     st.info(" | ".join(strategy_summary))
 
 
@@ -408,6 +418,14 @@ def _run_daily_signal(params):
 
             if params.get('use_adx', False):
                 qqq_data = calculate_adx(qqq_data, params['adx_period'])
+
+            if params.get('use_supertrend', False):
+                from core.indicators import calculate_supertrend
+                qqq_data = calculate_supertrend(qqq_data, period=params.get('st_period', 10), multiplier=params.get('st_multiplier', 3.0))
+
+            if params.get('use_pivot', False):
+                from core.indicators import calculate_pivot_points
+                qqq_data = calculate_pivot_points(qqq_data, pivot_left=params.get('pivot_left', 5), pivot_right=params.get('pivot_right', 5))
             
             latest_date = qqq_data.index[-1]
             latest_qqq_close = qqq_data.iloc[-1]['Close']
@@ -569,7 +587,8 @@ def _run_custom_simulation(params, test_params):
             params.get('use_macd', False), params.get('macd_fast', 12),
             params.get('macd_slow', 26), params.get('macd_signal_period', 9),
             params.get('use_adx', False), params.get('adx_period', 14),
-            params.get('adx_threshold', 25), params.get('use_supertrend', False), params.get('st_period', 10), params.get('st_multiplier', 3.0)
+            params.get('adx_threshold', 25), params.get('use_supertrend', False), params.get('st_period', 10), params.get('st_multiplier', 3.0),
+            params.get('use_pivot', False), params.get('pivot_left', 5), params.get('pivot_right', 5)
         )
         
         # Calculate QQQ benchmark
@@ -619,7 +638,7 @@ def _run_custom_simulation(params, test_params):
     
     # Performance Chart
     with st.expander("📉 Performance Chart", expanded=True):
-        fig = create_performance_chart(result, qqq, tqqq, start_date, initial_capital, params['ema_period'])
+        fig = create_performance_chart(result, qqq, tqqq, start_date, initial_capital, params['ema_period'], params)
         st.plotly_chart(fig, use_container_width=True)
     
     # Trade Log
@@ -699,7 +718,8 @@ def _run_monte_carlo(params, test_params):
             params.get('use_macd', False), params.get('macd_fast', 12),
             params.get('macd_slow', 26), params.get('macd_signal_period', 9),
             params.get('use_adx', False), params.get('adx_period', 14),
-            params.get('adx_threshold', 25), params.get('use_supertrend', False), params.get('st_period', 10), params.get('st_multiplier', 3.0)
+            params.get('adx_threshold', 25), params.get('use_supertrend', False), params.get('st_period', 10), params.get('st_multiplier', 3.0),
+            params.get('use_pivot', False), params.get('pivot_left', 5), params.get('pivot_right', 5)
         )
         
         portfolio_df = result['portfolio_df'].copy()

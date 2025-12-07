@@ -2,10 +2,10 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
-from core.indicators import calculate_ema
+from core.indicators import calculate_ema, calculate_pivot_points, calculate_supertrend
 
 
-def create_performance_chart(result, qqq_data, tqqq_data, start_date, initial_capital, ema_period):
+def create_performance_chart(result, qqq_data, tqqq_data, start_date, initial_capital, ema_period, params=None):
     """Create performance chart with QQQ benchmark.
     
     Args:
@@ -15,6 +15,7 @@ def create_performance_chart(result, qqq_data, tqqq_data, start_date, initial_ca
         start_date: Backtest start date
         initial_capital: Initial capital amount
         ema_period: EMA period for chart
+        params: Strategy parameters dict (optional, for showing pivot points and other indicators)
         
     Returns:
         Plotly figure object
@@ -90,8 +91,25 @@ def create_performance_chart(result, qqq_data, tqqq_data, start_date, initial_ca
         row=1, col=1
     )
     
-    # QQQ Price vs EMA
+    # QQQ Price vs EMA and indicators
     qqq_with_ema = calculate_ema(qqq_data, ema_period)
+    
+    # Add pivot points if enabled
+    if params and params.get('use_pivot', False):
+        qqq_with_ema = calculate_pivot_points(
+            qqq_with_ema, 
+            pivot_left=params.get('pivot_left', 5), 
+            pivot_right=params.get('pivot_right', 5)
+        )
+    
+    # Add supertrend if enabled
+    if params and params.get('use_supertrend', False):
+        qqq_with_ema = calculate_supertrend(
+            qqq_with_ema,
+            period=params.get('st_period', 10),
+            multiplier=params.get('st_multiplier', 3.0)
+        )
+    
     qqq_display = qqq_with_ema.loc[start_date:]
     
     fig.add_trace(
@@ -113,6 +131,70 @@ def create_performance_chart(result, qqq_data, tqqq_data, start_date, initial_ca
         ),
         row=2, col=1
     )
+    
+    # Plot pivot points if available
+    if params and params.get('use_pivot', False) and 'Pivot_High' in qqq_display.columns:
+        pivot_highs = qqq_display[qqq_display['Pivot_High'].notna()]
+        if len(pivot_highs) > 0:
+            # Add markers for pivot highs
+            fig.add_trace(
+                go.Scatter(
+                    x=pivot_highs.index,
+                    y=pivot_highs['Pivot_High'],
+                    mode='markers',
+                    name=f'🔴 Pivot High Resistance (L:{params["pivot_left"]}/R:{params["pivot_right"]})',
+                    marker=dict(symbol='triangle-down', size=14, color='red', line=dict(color='darkred', width=2)),
+                    hovertemplate='<b>🔴 PIVOT HIGH (Resistance)</b><br>Date: %{x}<br>Price: $%{y:.2f}<br>Left Bars: ' + str(params["pivot_left"]) + '<br>Right Bars: ' + str(params["pivot_right"]) + '<extra></extra>'
+                ),
+                row=2, col=1
+            )
+            
+            # Add horizontal lines extending from pivot highs
+            for idx, row_data in pivot_highs.iterrows():
+                fig.add_hline(
+                    y=row_data['Pivot_High'],
+                    line_dash="dash",
+                    line_color="rgba(255, 0, 0, 0.3)",
+                    line_width=1,
+                    row=2, col=1
+                )
+        
+        pivot_lows = qqq_display[qqq_display['Pivot_Low'].notna()]
+        if len(pivot_lows) > 0:
+            # Add markers for pivot lows
+            fig.add_trace(
+                go.Scatter(
+                    x=pivot_lows.index,
+                    y=pivot_lows['Pivot_Low'],
+                    mode='markers',
+                    name=f'🟢 Pivot Low Support (L:{params["pivot_left"]}/R:{params["pivot_right"]})',
+                    marker=dict(symbol='triangle-up', size=14, color='lime', line=dict(color='darkgreen', width=2)),
+                    hovertemplate='<b>🟢 PIVOT LOW (Support)</b><br>Date: %{x}<br>Price: $%{y:.2f}<br>Left Bars: ' + str(params["pivot_left"]) + '<br>Right Bars: ' + str(params["pivot_right"]) + '<extra></extra>'
+                ),
+                row=2, col=1
+            )
+            
+            # Add horizontal lines extending from pivot lows
+            for idx, row_data in pivot_lows.iterrows():
+                fig.add_hline(
+                    y=row_data['Pivot_Low'],
+                    line_dash="dash",
+                    line_color="rgba(0, 255, 0, 0.3)",
+                    line_width=1,
+                    row=2, col=1
+                )
+    
+    # Plot supertrend if available
+    if params and params.get('use_supertrend', False) and 'ST' in qqq_display.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=qqq_display.index,
+                y=qqq_display['ST'],
+                name=f'Supertrend ({params["st_period"]},{params["st_multiplier"]})',
+                line=dict(color='purple', width=2, dash='dot')
+            ),
+            row=2, col=1
+        )
     
     # Drawdown
     fig.add_trace(

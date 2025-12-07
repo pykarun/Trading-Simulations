@@ -25,6 +25,10 @@ def show_applied_params_banner():
         bb_text = "BB:On" if params.get('use_bb', False) else ""
         atr_text = f"ATR:{params.get('atr_multiplier', 0)}x" if params.get('use_atr', False) else ""
         msl_text = "MSL:On" if params.get('use_msl_msh', False) else ""
+        macd_text = "MACD:On" if params.get('use_macd', False) else ""
+        adx_text = "ADX:On" if params.get('use_adx', False) else ""
+        st_text = "ST:On" if params.get('use_supertrend', False) else ""
+        pivot_text = f"Pivot:{params.get('pivot_left', 5)}/{params.get('pivot_right', 5)}" if params.get('use_pivot', False) else ""
         
         # Build full summary
         summary_parts = [ema_text, rsi_text, sl_text]
@@ -34,6 +38,14 @@ def show_applied_params_banner():
             summary_parts.append(atr_text)
         if msl_text:
             summary_parts.append(msl_text)
+        if macd_text:
+            summary_parts.append(macd_text)
+        if adx_text:
+            summary_parts.append(adx_text)
+        if st_text:
+            summary_parts.append(st_text)
+        if pivot_text:
+            summary_parts.append(pivot_text)
         
         summary = " | ".join(summary_parts)
         
@@ -94,7 +106,9 @@ def _build_canonical_params(params: dict) -> dict:
 
         'use_msl_msh': params.get('use_msl_msh', False),
         'msl_period': params.get('msl_period', 20),
+        'msh_period': params.get('msh_period', 20),
         'msl_lookback': params.get('msl_lookback', 5),
+        'msh_lookback': params.get('msh_lookback', 5),
 
         'use_macd': params.get('use_macd', False),
         'macd_fast': params.get('macd_fast', 12),
@@ -108,6 +122,10 @@ def _build_canonical_params(params: dict) -> dict:
         'use_supertrend': params.get('use_supertrend', False),
         'st_period': params.get('st_period', 10),
         'st_multiplier': params.get('st_multiplier', 3.0),
+
+        'use_pivot': params.get('use_pivot', False),
+        'pivot_left': params.get('pivot_left', 5),
+        'pivot_right': params.get('pivot_right', 5),
 
         # Stop-loss canonical keys
         'use_stop_loss': params.get('use_stop_loss', False),

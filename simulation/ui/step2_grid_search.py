@@ -81,6 +81,9 @@ def render_step2():
     # Supertrend section
     with st.container(border=True):
         enable_supertrend, st_config = _render_supertrend_section()
+    # Pivot Points section
+    with st.container(border=True):
+        enable_pivot, pivot_config = _render_pivot_section()
     
     # Initial Capital
     st.markdown("---")
@@ -104,8 +107,8 @@ def render_step2():
             enable_ema, ema_config, enable_rsi, rsi_config,
             enable_sl, sl_config, enable_bb, bb_config,
             enable_atr, atr_config, enable_msl, msl_config,
-            enable_macd, macd_config, enable_adx, adx_config
-            , enable_supertrend, st_config
+            enable_macd, macd_config, enable_adx, adx_config,
+            enable_supertrend, st_config, enable_pivot, pivot_config
         )
     
     # Display Results
@@ -470,13 +473,45 @@ def _render_supertrend_section():
         }
 
 
+def _render_pivot_section():
+    """Render Pivot Point configuration section."""
+    with st.container(border=True):
+        st.markdown("**📍 Pivot Points** (Optional)")
+        enable_pivot = st.checkbox("Enable Pivot Points", value=False, key="enable_pivot", help="Include Pivot Points in grid search")
+
+        if not enable_pivot:
+            st.caption("⚠️ Pivot Points are disabled.")
+            return False, {}
+
+        st.caption("Use Pivot Point highs and lows as support/resistance levels")
+
+        pivot_left_range = st.multiselect(
+            "Pivot Left Lookback",
+            options=[3, 5, 7, 10, 15],
+            default=[5],
+            help="Number of bars to the left for pivot detection"
+        )
+
+        pivot_right_range = st.multiselect(
+            "Pivot Right Lookback",
+            options=[3, 5, 7, 10, 15],
+            default=[5],
+            help="Number of bars to the right for pivot detection"
+        )
+
+        return enable_pivot, {
+            'pivot_left_range': pivot_left_range,
+            'pivot_right_range': pivot_right_range
+        }
+
+
 def _execute_grid_search(
     selected_periods, test_multiple_periods, grid_capital,
     enable_ema, ema_config, enable_rsi, rsi_config,
     enable_sl, sl_config, enable_bb, bb_config,
     enable_atr, atr_config, enable_msl, msl_config,
-    enable_macd, macd_config, enable_adx, adx_config
-    , enable_supertrend=None, st_config=None
+    enable_macd, macd_config, enable_adx, adx_config,
+    enable_supertrend=None, st_config=None, enable_pivot=None, pivot_config=None
 ):
     """Execute the grid search with given parameters."""
     
@@ -494,8 +529,8 @@ def _execute_grid_search(
         enable_ema, ema_config, enable_rsi, rsi_config,
         enable_sl, sl_config, enable_bb, bb_config,
         enable_atr, atr_config, enable_msl, msl_config,
-        enable_macd, macd_config, enable_adx, adx_config
-        , enable_supertrend, st_config
+        enable_macd, macd_config, enable_adx, adx_config,
+        enable_supertrend, st_config, enable_pivot, pivot_config
     )
     
     # Determine periods to test
@@ -581,8 +616,9 @@ def _execute_grid_search(
                     params['macd_signal_period'],
                     params['use_adx'],
                     params['adx_period'],
-                    params['adx_threshold']
-                    , params.get('use_supertrend', False), params.get('st_period', 10), params.get('st_multiplier', 3.0)
+                    params['adx_threshold'],
+                    params.get('use_supertrend', False), params.get('st_period', 10), params.get('st_multiplier', 3.0),
+                    params.get('use_pivot', False), params.get('pivot_left', 5), params.get('pivot_right', 5)
                 )
                 
                 # Calculate metrics
@@ -647,8 +683,8 @@ def _generate_param_combinations(
     enable_ema, ema_config, enable_rsi, rsi_config,
     enable_sl, sl_config, enable_bb, bb_config,
     enable_atr, atr_config, enable_msl, msl_config,
-    enable_macd, macd_config, enable_adx, adx_config
-    , enable_supertrend=None, st_config=None
+    enable_macd, macd_config, enable_adx, adx_config,
+    enable_supertrend=None, st_config=None, enable_pivot=None, pivot_config=None
 ):
     """Generate all parameter combinations for grid search using itertools."""
     
@@ -719,15 +755,22 @@ def _generate_param_combinations(
         st_config.get('st_multiplier_range', [3.0]) if enable_supertrend and st_config else [3.0]
     ))
 
+    # Pivot Points parameters
+    pivot_params = list(itertools.product(
+        ["Enabled", "Disabled"] if enable_pivot else ["Disabled"],
+        pivot_config.get('pivot_left_range', [5]) if enable_pivot and pivot_config else [5],
+        pivot_config.get('pivot_right_range', [5]) if enable_pivot and pivot_config else [5]
+    ))
+
     # Combine all parameter sets
     all_combinations = itertools.product(
         ema_strategy_params, rsi_params, sl_params, bb_params,
-        atr_params, msl_params, macd_params, adx_params
-        , st_params
+        atr_params, msl_params, macd_params, adx_params,
+        st_params, pivot_params
     )
 
     for combo in all_combinations:
-        ema_p, rsi_p, sl_p, bb_p, atr_p, msl_p, macd_p, adx_p, st_p = combo
+        ema_p, rsi_p, sl_p, bb_p, atr_p, msl_p, macd_p, adx_p, st_p, pivot_p = combo
 
         use_bb = bb_p[0] == "Enabled"
         use_atr = atr_p[0] == "Enabled"
@@ -735,6 +778,7 @@ def _generate_param_combinations(
         use_macd = macd_p[0] == "Enabled"
         use_adx = adx_p[0] == "Enabled"
         use_st = st_p[0] == "Enabled"
+        use_pivot = pivot_p[0] == "Enabled"
 
         param_dict = _create_param_dict(
             use_ema=enable_ema,
@@ -763,8 +807,9 @@ def _generate_param_combinations(
             macd_signal=macd_p[3],
             use_adx=use_adx,
             adx_period=adx_p[1],
-            adx_thresh=adx_p[2]
-            , use_supertrend=use_st, st_period=st_p[1], st_multiplier=st_p[2]
+            adx_thresh=adx_p[2],
+            use_supertrend=use_st, st_period=st_p[1], st_multiplier=st_p[2],
+            use_pivot=use_pivot, pivot_left=pivot_p[1], pivot_right=pivot_p[2]
         )
         param_combinations.append(param_dict)
         
@@ -780,7 +825,8 @@ def _create_param_dict(
     use_msl_msh, msl_period, msl_lookback,
     use_macd, macd_fast, macd_slow, macd_signal,
     use_adx, adx_period, adx_thresh,
-    use_supertrend=False, st_period=10, st_multiplier=3.0
+    use_supertrend=False, st_period=10, st_multiplier=3.0,
+    use_pivot=False, pivot_left=5, pivot_right=5
 ):
     """Create a parameter dictionary."""
     return {
@@ -817,7 +863,10 @@ def _create_param_dict(
         'adx_threshold': adx_thresh,
         'use_supertrend': use_supertrend,
         'st_period': st_period,
-        'st_multiplier': st_multiplier
+        'st_multiplier': st_multiplier,
+        'use_pivot': use_pivot,
+        'pivot_left': pivot_left,
+        'pivot_right': pivot_right
     }
 
 
@@ -850,6 +899,9 @@ def _build_param_string(params, period_name=None):
         param_str += f" | ADX({params['adx_period']},{params['adx_threshold']})"
     if params.get('use_supertrend', False):
         param_str += f" | ST({params['st_period']},{params['st_multiplier']})"
+    
+    if params.get('use_pivot', False):
+        param_str += f" | Pivot({params['pivot_left']},{params['pivot_right']})"
     
     if period_name:
         param_str = f"[{period_name}] {param_str}"

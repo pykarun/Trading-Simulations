@@ -302,6 +302,36 @@ def _render_testing_tabs(test_tab1, test_tab2, test_tab3, params):
             end_date = st.date_input("End Date", value=default_end, min_value=datetime.date(2010, 3, 31), max_value=datetime.date.today())
         with col3:
             initial_capital = st.number_input("Initial Capital ($)", min_value=1000, max_value=1000000, value=10000, step=1000)
+
+        freq_label = st.radio(
+            "Data Frequency",
+            options=["Daily (1d)", "Intraday 30m (Local Repo)"],
+            index=0,
+            help="Daily: fetch from yfinance. Intraday 30m: use/append to local repository (QQQ_30m.csv, TQQQ_30m.csv in data_30m/ folder)."
+        )
+        frequency = '1d' if freq_label.startswith('Daily') else '30m'
+        use_local_30m = frequency == '30m'
+        
+        st.markdown("---")
+        
+        if use_local_30m:
+            st.info("📥 **30m Local Repository:** Click 'Initialize' once to bootstrap ~60 days from Yahoo Finance. Auto-appends on future runs.")
+            if st.button("⬇️ Initialize 30m Data (QQQ & TQQQ)", key="init_30m_btn", use_container_width=True):
+                from core.intraday_data import append_new_data
+                with st.spinner("Downloading QQQ 30m data..."):
+                    try:
+                        append_new_data("QQQ")
+                        st.success("✅ QQQ 30m data saved!")
+                    except Exception as e:
+                        st.error(f"❌ QQQ error: {e}")
+                with st.spinner("Downloading TQQQ 30m data..."):
+                    try:
+                        append_new_data("TQQQ")
+                        st.success("✅ TQQQ 30m data saved!")
+                    except Exception as e:
+                        st.error(f"❌ TQQQ error: {e}")
+                st.success("✅ Initialization complete! Refresh and run simulation.")
+            st.stop()  # Stop to let user see success message
         
         st.markdown("---")
         run_button_custom = st.button("🚀 Execute - Run Custom Simulation", type="primary", use_container_width=True, key="custom_sim_btn")
@@ -309,7 +339,9 @@ def _render_testing_tabs(test_tab1, test_tab2, test_tab3, params):
         test_params['custom'] = {
             'start_date': start_date,
             'end_date': end_date,
-            'initial_capital': initial_capital
+            'initial_capital': initial_capital,
+            'frequency': frequency,
+            'use_local_30m': use_local_30m
         }
     
     # Monte Carlo Tab
@@ -560,17 +592,26 @@ def _run_custom_simulation(params, test_params):
     start_date = custom_params['start_date']
     end_date = custom_params['end_date']
     initial_capital = custom_params['initial_capital']
+    frequency = custom_params.get('frequency', '1d')
+    use_local_30m = custom_params.get('use_local_30m', False)
     
     st.markdown("---")
     st.markdown("## 📊 Results")
     st.markdown("---")
     
     with st.spinner("Running custom simulation..."):
-        tickers = ["QQQ", "TQQQ"]
-        raw_data = get_data(tickers, start_date, end_date, buffer_days=max(365, params['ema_period'] + 100))
-        
-        qqq = raw_data["QQQ"].copy()
-        tqqq = raw_data["TQQQ"].copy()
+        if use_local_30m:
+            # Use local 30m repository
+            from core.intraday_data import get_30m_data_range
+            with st.spinner("Loading/updating local 30m data repository..."):
+                qqq = get_30m_data_range("QQQ", start_date, end_date)
+                tqqq = get_30m_data_range("TQQQ", start_date, end_date)
+        else:
+            # Use yfinance daily data
+            tickers = ["QQQ", "TQQQ"]
+            raw_data = get_data(tickers, start_date, end_date, buffer_days=max(365, params['ema_period'] + 100), interval=frequency)
+            qqq = raw_data["QQQ"].copy()
+            tqqq = raw_data["TQQQ"].copy()
         
         result = run_tqqq_only_strategy(
             qqq.copy(), tqqq.copy(), start_date, end_date, initial_capital,

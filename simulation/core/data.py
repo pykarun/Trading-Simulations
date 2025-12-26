@@ -4,7 +4,7 @@ import pandas as pd
 from curl_cffi import requests
 
 
-def get_data(tickers, start_date, end_date, buffer_days=365):
+def get_data(tickers, start_date, end_date, buffer_days=365, interval='1d'):
     """Download data using curl_cffi session.
 
     This function avoids importing Streamlit at module import time so it can be
@@ -22,13 +22,14 @@ def get_data(tickers, start_date, end_date, buffer_days=365):
         DataFrame with OHLCV data
     """
 
-    def _fetch(tickers_inner, start_inner, end_inner, buffer_days_inner):
+    def _fetch(tickers_inner, start_inner, end_inner, buffer_days_inner, interval_inner):
         session = requests.Session(impersonate="chrome110", verify=False)
         fetch_start_date = (pd.to_datetime(start_inner) - pd.DateOffset(days=buffer_days_inner)).strftime('%Y-%m-%d')
         data = yf.download(
             tickers_inner,
             start=fetch_start_date,
             end=end_inner,
+            interval=interval_inner,
             session=session,
             auto_adjust=False,
             group_by='ticker',
@@ -43,6 +44,6 @@ def get_data(tickers, start_date, end_date, buffer_days=365):
     try:
         import streamlit as st
         cached = st.cache_data(ttl=3600)(_fetch)
-        return cached(tickers, start_date, end_date, buffer_days)
+        return cached(tickers, start_date, end_date, buffer_days, interval)
     except Exception:
-        return _fetch(tickers, start_date, end_date, buffer_days)
+        return _fetch(tickers, start_date, end_date, buffer_days, interval)

@@ -62,6 +62,17 @@ def run_tqqq_only_strategy(
     SLIPPAGE_SELL_PCT = 0.0010  # 0.10% slippage when selling
     COMMISSION_PCT = 0.0000     # 0% commission (Alpaca is free)
     
+    # Align timezone handling: ensure tz-naive index for consistent slicing
+    if hasattr(qqq_data.index, "tz") and qqq_data.index.tz is not None:
+        qqq_data = qqq_data.tz_convert(None)
+    if hasattr(tqqq_data.index, "tz") and tqqq_data.index.tz is not None:
+        tqqq_data = tqqq_data.tz_convert(None)
+
+    # Align indexes to common timestamps to avoid missing rows in intraday runs
+    common_index = qqq_data.index.intersection(tqqq_data.index)
+    qqq_data = qqq_data.loc[common_index]
+    tqqq_data = tqqq_data.loc[common_index]
+
     # Only calculate EMA if enabled
     if use_ema:
         if use_double_ema:
@@ -99,7 +110,12 @@ def run_tqqq_only_strategy(
         qqq_data = calculate_pivot_points(qqq_data, pivot_left, pivot_right)
         tqqq_data = calculate_pivot_points(tqqq_data, pivot_left, pivot_right)
     
-    sim_data = qqq_data[start_date:end_date].copy()
+    # For intraday data (timestamps), convert date boundaries to datetime range
+    sim_start = pd.Timestamp(start_date)
+    sim_end = pd.Timestamp(end_date) + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+    sim_data = qqq_data[sim_start:sim_end].copy()
+    if sim_data.empty:
+        raise ValueError(f"No overlapping data for {start_date} to {end_date}; check date range and data frequency.")
     
     capital = initial_capital
     position = None
@@ -208,6 +224,34 @@ def run_tqqq_only_strategy(
         else:
             signal = base_signal
         
+        # Get pivot point values early for signal filters
+        pivot_high_val = 'N/A'
+        pivot_low_val = 'N/A'
+        pivot_status = 'None'
+        nearest_pivot_high = 'N/A'
+        nearest_pivot_low = 'N/A'
+        last_pivot_high_level = None
+        last_pivot_low_level = None
+        if use_pivot:
+            if 'Pivot_High' in sim_data.columns and pd.notna(sim_data.iloc[i]['Pivot_High']):
+                pivot_high_val = f'${sim_data.iloc[i]["Pivot_High"]:.2f}'
+                pivot_status = '🔴 AT PIVOT HIGH (Resistance)'
+            if 'Pivot_Low' in sim_data.columns and pd.notna(sim_data.iloc[i]['Pivot_Low']):
+                pivot_low_val = f'${sim_data.iloc[i]["Pivot_Low"]:.2f}'
+                pivot_status = '🟢 AT PIVOT LOW (Support)'
+
+            if 'Pivot_High' in sim_data.columns:
+                prev_pivot_highs = sim_data.iloc[:i+1]['Pivot_High'].dropna()
+                if len(prev_pivot_highs) > 0:
+                    last_pivot_high_level = prev_pivot_highs.iloc[-1]
+                    nearest_pivot_high = f'${last_pivot_high_level:.2f}'
+
+            if 'Pivot_Low' in sim_data.columns:
+                prev_pivot_lows = sim_data.iloc[:i+1]['Pivot_Low'].dropna()
+                if len(prev_pivot_lows) > 0:
+                    last_pivot_low_level = prev_pivot_lows.iloc[-1]
+                    nearest_pivot_low = f'${last_pivot_low_level:.2f}'
+
         # Apply filters that can turn a BUY signal into a SELL
         if signal == 'BUY':
             # Bollinger Bands buy filter
@@ -237,10 +281,24 @@ def run_tqqq_only_strategy(
                 if pd.isna(st_dir) or st_dir != 1:
                     signal = 'SELL'
 
+            # Pivot-based buy filter: only buy when price is near/at latest pivot low
+            if use_pivot and signal == 'BUY':
+                pivot_tolerance = 0.005  # allow up to 0.5% above pivot low
+                if last_pivot_low_level is None:
+                    signal = 'SELL'
+                elif qqq_close > last_pivot_low_level * (1 + pivot_tolerance):
+                    signal = 'SELL'
+
         # Standalone SELL conditions that can override anything
         if use_bb:
             bb_position = sim_data.iloc[i]['BB_Position']
             if pd.notna(bb_position) and position == 'TQQQ' and bb_position >= bb_sell_threshold:
+                signal = 'SELL'
+
+        # Pivot-based sell filter: exit if price is at/near latest pivot high while in position
+        if use_pivot and position == 'TQQQ':
+            pivot_tolerance = 0.005  # allow 0.5% buffer below pivot high
+            if last_pivot_high_level is not None and qqq_close >= last_pivot_high_level * (1 - pivot_tolerance):
                 signal = 'SELL'
 
         
@@ -248,6 +306,7 @@ def run_tqqq_only_strategy(
             signal = 'SELL'
         
         action = 'HOLD'
+        # Only buy when a valid signal occurs; no forced day-1 entry
         if signal == 'BUY' and position != 'TQQQ':
             execution_price = tqqq_close * (1 + SLIPPAGE_BUY_PCT)
             shares = capital / execution_price
@@ -295,6 +354,8 @@ def run_tqqq_only_strategy(
         pivot_status = 'None'
         nearest_pivot_high = 'N/A'
         nearest_pivot_low = 'N/A'
+        last_pivot_high_level = None
+        last_pivot_low_level = None
         
         if use_pivot:
             # Check if currently at a pivot point
@@ -309,12 +370,14 @@ def run_tqqq_only_strategy(
             if 'Pivot_High' in sim_data.columns:
                 prev_pivot_highs = sim_data.iloc[:i+1]['Pivot_High'].dropna()
                 if len(prev_pivot_highs) > 0:
-                    nearest_pivot_high = f'${prev_pivot_highs.iloc[-1]:.2f}'
+                    last_pivot_high_level = prev_pivot_highs.iloc[-1]
+                    nearest_pivot_high = f'${last_pivot_high_level:.2f}'
             
             if 'Pivot_Low' in sim_data.columns:
                 prev_pivot_lows = sim_data.iloc[:i+1]['Pivot_Low'].dropna()
                 if len(prev_pivot_lows) > 0:
-                    nearest_pivot_low = f'${prev_pivot_lows.iloc[-1]:.2f}'
+                    last_pivot_low_level = prev_pivot_lows.iloc[-1]
+                    nearest_pivot_low = f'${last_pivot_low_level:.2f}'
         
         # Get supertrend value if enabled
         supertrend_val = 'N/A'
@@ -374,6 +437,9 @@ def run_tqqq_only_strategy(
         
         portfolio_value.append({'Date': date, 'Value': current_value})
     
+    if not portfolio_value:
+        raise ValueError("No portfolio history generated; ensure data frequency covers the selected dates.")
+
     portfolio_df = pd.DataFrame(portfolio_value).set_index('Date')
     final_value = portfolio_df['Value'].iloc[-1]
     total_return = ((final_value - initial_capital) / initial_capital) * 100

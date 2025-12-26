@@ -23,60 +23,65 @@ from core import get_data, run_tqqq_only_strategy
 
 
 def generate_param_combinations_file():
-    """Generate all parameter combinations and save to CSV file."""
+    """Generate all parameter combinations and save to CSV file.
+    
+    Note: This generates a REDUCED set for testing. Adjust ranges below for comprehensive search.
+    """
     
     print("Generating parameter combinations...")
+    print("  Using REDUCED parameter ranges for faster execution...")
+    print("  Edit this function to expand ranges for comprehensive grid search.")
     
-    # EMA strategies
-    single_ema_periods = [10, 20, 21, 30, 40, 50, 60, 80, 100]
-    fast_ema_range = [5, 8, 9, 10, 12, 15, 20, 21]
-    slow_ema_range = [15, 20, 21, 25, 30, 40, 50]
+    # EMA strategies - REDUCED
+    single_ema_periods = [20, 50]  # Was: [10, 20, 21, 30, 40, 50, 60, 80, 100]
+    fast_ema_range = [9, 12]  # Was: [5, 8, 9, 10, 12, 15, 20, 21]
+    slow_ema_range = [21, 50]  # Was: [15, 20, 21, 25, 30, 40, 50]
     
-    # RSI parameters
-    rsi_range = [0, 40, 45, 50, 55, 60]
-    rsi_oversold_range = [20, 25, 30, 35, 40]
-    rsi_overbought_range = [60, 65, 70, 75, 80]
+    # RSI parameters - REDUCED
+    rsi_range = [0, 50]  # Was: [0, 40, 45, 50, 55, 60]
+    rsi_oversold_range = [30]  # Was: [20, 25, 30, 35, 40]
+    rsi_overbought_range = [70]  # Was: [60, 65, 70, 75, 80]
     
-    # Stop-Loss
-    stop_loss_range = [0, 5, 8, 10, 12, 15, 20]
+    # Stop-Loss - REDUCED
+    stop_loss_range = [0, 10, 15]  # Was: [0, 5, 8, 10, 12, 15, 20]
     
-    # Bollinger Bands
-    bb_enabled = ["Enabled", "Disabled"]
-    bb_period_range = [10, 15, 20, 25, 30]
-    bb_std_dev_range = [1.5, 2.0, 2.5]
-    bb_buy_threshold_range = [0.0, 0.1, 0.2, 0.3]
-    bb_sell_threshold_range = [0.7, 0.8, 0.9, 1.0]
+    # Bollinger Bands - REDUCED
+    bb_enabled = ["Disabled"]  # Was: ["Enabled", "Disabled"]
+    bb_period_range = [20]  # Was: [10, 15, 20, 25, 30]
+    bb_std_dev_range = [2.0]  # Was: [1.5, 2.0, 2.5]
+    bb_buy_threshold_range = [0.2]  # Was: [0.0, 0.1, 0.2, 0.3]
+    bb_sell_threshold_range = [0.8]  # Was: [0.7, 0.8, 0.9, 1.0]
     
-    # ATR Stop-Loss
-    atr_enabled = ["Enabled", "Disabled"]
-    atr_period_range = [7, 10, 14, 20, 30]
-    atr_multiplier_range = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+    # ATR Stop-Loss - REDUCED
+    atr_enabled = ["Disabled"]  # Was: ["Enabled", "Disabled"]
+    atr_period_range = [14]  # Was: [7, 10, 14, 20, 30]
+    atr_multiplier_range = [2.0]  # Was: [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
     
-    # MSL/MSH Stop-Loss
-    msl_enabled = ["Enabled", "Disabled"]
-    msl_period_range = [10, 15, 20, 25, 30]
-    msl_lookback_range = [3, 5, 7, 10, 15]
+    # MSL/MSH Stop-Loss - REDUCED
+    msl_enabled = ["Disabled"]  # Was: ["Enabled", "Disabled"]
+    msl_period_range = [20]  # Was: [10, 15, 20, 25, 30]
+    msl_lookback_range = [5]  # Was: [3, 5, 7, 10, 15]
     
-    # MACD
-    macd_enabled = ["Enabled", "Disabled"]
-    macd_fast_range = [9, 10, 12, 15]
-    macd_slow_range = [20, 21, 25, 26]
-    macd_signal_range = [7, 8, 9, 10]
+    # MACD - REDUCED
+    macd_enabled = ["Disabled"]  # Was: ["Enabled", "Disabled"]
+    macd_fast_range = [12]  # Was: [9, 10, 12, 15]
+    macd_slow_range = [26]  # Was: [20, 21, 25, 26]
+    macd_signal_range = [9]  # Was: [7, 8, 9, 10]
     
-    # ADX
-    adx_enabled = ["Enabled", "Disabled"]
-    adx_period_range = [10, 12, 14, 20]
-    adx_threshold_range = [20, 25, 30]
+    # ADX - REDUCED
+    adx_enabled = ["Disabled"]  # Was: ["Enabled", "Disabled"]
+    adx_period_range = [14]  # Was: [10, 12, 14, 20]
+    adx_threshold_range = [25]  # Was: [20, 25, 30]
     
-    # Supertrend
-    st_enabled = ["Enabled", "Disabled"]
-    st_period_range = [7, 10, 14, 21]
-    st_multiplier_range = [1.5, 2.0, 2.5, 3.0]
+    # Supertrend - REDUCED
+    st_enabled = ["Disabled"]  # Was: ["Enabled", "Disabled"]
+    st_period_range = [10]  # Was: [7, 10, 14, 21]
+    st_multiplier_range = [3.0]  # Was: [1.5, 2.0, 2.5, 3.0]
     
-    # Pivot Points
+    # Pivot Points - REDUCED (Enable this to test)
     pivot_enabled = ["Enabled", "Disabled"]
-    pivot_left_range = [3, 5, 7, 10]
-    pivot_right_range = [3, 5, 7, 10]
+    pivot_left_range = [5, 7]  # Was: [3, 5, 7, 10]
+    pivot_right_range = [5, 7]  # Was: [3, 5, 7, 10]
     
     # Create temp file for parameter combinations
     temp_file = Path(__file__).parent / "temp_param_combinations.csv"
@@ -246,7 +251,12 @@ def process_period_file_based(period_name, days_back, qqq, tqqq, initial_capital
     
     result_fieldnames = [
         'Period', 'Parameters', 'Final Value', 'Total Return %', 'CAGR %',
-        'Max Drawdown %', 'Sharpe Ratio', 'Trades', 'vs QQQ %', 'QQQ Return %'
+        'Max Drawdown %', 'Sharpe Ratio', 'Trades', 'vs QQQ %', 'QQQ Return %',
+        # Detailed parameter breakdown
+        'use_double_ema', 'ema_period', 'ema_fast', 'ema_slow',
+        'use_rsi', 'rsi_threshold', 'use_stop_loss', 'stop_loss_pct',
+        'use_bb', 'use_atr', 'use_msl_msh', 'use_macd', 'use_adx',
+        'use_supertrend', 'use_pivot', 'pivot_left', 'pivot_right'
     ]
     
     # Process parameter combinations in batches
@@ -446,7 +456,25 @@ def process_period_file_based(period_name, days_back, qqq, tqqq, initial_capital
                         'Sharpe Ratio': sharpe,
                         'Trades': result['num_trades'],
                         'vs QQQ %': outperformance,
-                        'QQQ Return %': qqq_bh_return
+                        'QQQ Return %': qqq_bh_return,
+                        # Detailed parameter breakdown
+                        'use_double_ema': params['use_double_ema'],
+                        'ema_period': params['ema_period'],
+                        'ema_fast': params['ema_fast'],
+                        'ema_slow': params['ema_slow'],
+                        'use_rsi': params['use_rsi'],
+                        'rsi_threshold': params['rsi_threshold'],
+                        'use_stop_loss': params['use_stop_loss'],
+                        'stop_loss_pct': params['stop_loss_pct'],
+                        'use_bb': params['use_bb'],
+                        'use_atr': params['use_atr'],
+                        'use_msl_msh': params['use_msl_msh'],
+                        'use_macd': params['use_macd'],
+                        'use_adx': params['use_adx'],
+                        'use_supertrend': params['use_supertrend'],
+                        'use_pivot': params['use_pivot'],
+                        'pivot_left': params['pivot_left'],
+                        'pivot_right': params['pivot_right']
                     })
                     
                 except Exception as e:
